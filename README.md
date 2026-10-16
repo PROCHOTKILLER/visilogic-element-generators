@@ -17,19 +17,19 @@ The suite contains four specialized generators and shared template engines:
 ```text
 visilogic-element-generators/
 │
-├── generator data tables/       # VisiLogic Data Tables Generator (.xml)
-├── generator hmi displays/      # HMI Screens & Display Generator (.vld)
-├── generator operands/          # Operands & Symbols Database Generator (.csv)
-├── generator subroutine/        # Ladder Logic Subroutines Generator (.vlx)
+├── data-tables-generator/       # VisiLogic Data Tables Generator (.xml)
+├── hmi-displays-generator/      # HMI Screens & Display Generator (.vld)
+├── operands-generator/          # Operands & Symbols Database Generator (.csv)
+├── subroutine-generator/        # Ladder Logic Subroutines Generator (.vlx)
 │
-├── generuj_instrukcje_pdf.ps1   # Documentation to PDF compiler
+├── generate_manual_pdf.ps1      # Documentation to PDF compiler
 ├── .gitignore                   # Version control rules
 └── README.md                    # Project documentation
 ```
 
 ---
 
-### 1. 📊 Data Tables Generator (`generator data tables/`)
+### 1. 📊 Data Tables Generator (`data-tables-generator/`)
 - **Output Format**: Native VisiLogic Data Table XML files (`.xml`).
 - **Core Builder**: `DataTableBuilder.ps1`
 - **Capabilities**:
@@ -42,20 +42,20 @@ visilogic-element-generators/
 
 ---
 
-### 2. 🖥️ HMI Displays Generator (`generator hmi displays/`)
+### 2. 🖥️ HMI Displays Generator (`hmi-displays-generator/`)
 - **Output Format**: VisiLogic Display files (`.vld`).
 - **Core Builder**: `HmiDisplayBuilder.ps1`
 - **Capabilities**:
   - Generates complete HMI graphical screens compliant with the **ANSI/ISA-101.01** High-Performance HMI industrial standard (grayscale backgrounds, high-contrast alarm indicators, analog bar meters).
   - Generates touch buttons, numeric variables (`MI`), binary text indicators (`MB`), timers (`T`), alarms, and navigation bars.
   - Includes sample displays (`KOMORA9_HMI_DISPLAYS.vld`, `KOMORA9_HMI_ISA101.vld`, `DEMO_DISPLAYS.vld`).
-  - Comprehensive documentation in `STANDARD_ISA101_HMI.md` and `BIBLIOTEKA_ELEMENTOW.md`.
+  - Comprehensive documentation in `ISA101_HMI_STANDARD.md` and `ELEMENTS_LIBRARY.md`.
 - **Import into VisiLogic**:
   - In VisiLogic: **HMI Displays** > Right Click > **Import Display** (`.vld`).
 
 ---
 
-### 3. 🏷️ Operands Database Generator (`generator operands/`)
+### 3. 🏷️ Operands Database Generator (`operands-generator/`)
 - **Output Format**: Operands description and symbolic tag table (`.csv`).
 - **Core Builder**: `OperandsBuilder.ps1`
 - **Capabilities**:
@@ -72,14 +72,14 @@ visilogic-element-generators/
 
 ---
 
-### 4. 🪜 Ladder Subroutine Generator (`generator subroutine/`)
+### 4. 🪜 Ladder Subroutine Generator (`subroutine-generator/`)
 - **Output Format**: Native Ladder Subroutine export files (`.vlx`).
 - **Core Builder**: `VlxBuilder.ps1`
 - **Capabilities**:
   - Generates ladder rungs (networks), logic contacts (NO, NC, Transition positive/negative), coils, and function blocks (Math, Store, Compare, Timer, Subroutine Calls).
   - Encodes rungs according to VisiLogic's binary/XML ladder serialization rules.
   - Supports modular state machine (sequencer) patterns and safety interlock routines.
-  - Includes element catalog in `BIBLIOTEKA_ELEMENTOW.md` and rung connection guide in `ZASADY_TWORZENIA_I_LACZENIA.md`.
+  - Includes element catalog in `ELEMENTS_LIBRARY.md` and rung connection guide in `CREATION_AND_LINKING_RULES.md`.
 - **Import into VisiLogic**:
   - In VisiLogic: **Ladder** > Right Click on Subroutines > **Import Subroutine** (`.vlx`).
 
@@ -89,25 +89,25 @@ visilogic-element-generators/
 
 ### Generating Operands:
 ```powershell
-cd "generator operands"
+cd operands-generator
 .\example_demo_operands.ps1
 ```
 
 ### Generating HMI Displays:
 ```powershell
-cd "generator hmi displays"
+cd hmi-displays-generator
 .\generate_isa101_displays.ps1
 ```
 
 ### Generating Data Tables:
 ```powershell
-cd "generator data tables"
+cd data-tables-generator
 .\example_demo_data_tables.ps1
 ```
 
 ### Generating Ladder Subroutine:
 ```powershell
-cd "generator subroutine"
+cd subroutine-generator
 .\example_demo.ps1
 ```
 

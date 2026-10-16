@@ -12,7 +12,7 @@ Rozwiązanie eliminuje konieczność ręcznego "wyklikiwania" powtarzalnych, sko
 ### Struktura katalogów pakietu:
 
 ```
-narzedzia/generator subroutine/
+subroutine-generator/
 ├── templates/
 │   └── template.vlx          # Wzorcowa, czysta baza Access/Jet z poprawną strukturą tabel
 ├── VlxBuilder.ps1             # Obiektowy silnik generatora (klasy VlxBuilder, VlxOpcodes, VlxOperandTypes)

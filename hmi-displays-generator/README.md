@@ -128,7 +128,7 @@ erDiagram
 Otwórz terminal PowerShell w głównym katalogu projektu i wykonaj polecenie:
 
 ```powershell
-powershell.exe -ExecutionPolicy Bypass -File "narzedzia\generator hmi displays\generate_komora9_hmi.ps1"
+powershell.exe -ExecutionPolicy Bypass -File "hmi-displays-generator\generate_komora9_hmi.ps1"
 ```
 
 Skrypt utworzy plik `KOMORA9_HMI_ISA101.vld` w katalogu generatora oraz w katalogu głównym projektu.
@@ -137,7 +137,7 @@ Skrypt utworzy plik `KOMORA9_HMI_ISA101.vld` w katalogu generatora oraz w katalo
 Przed importem do VisiLogic uruchom audytora integralności:
 
 ```powershell
-powershell.exe -ExecutionPolicy Bypass -File "narzedzia\generator hmi displays\verify_displays.ps1" -VldPath "KOMORA9_HMI_ISA101.vld"
+powershell.exe -ExecutionPolicy Bypass -File "hmi-displays-generator\verify_displays.ps1" -VldPath "KOMORA9_HMI_ISA101.vld"
 ```
 
 Oczekiwany wynik audytu:

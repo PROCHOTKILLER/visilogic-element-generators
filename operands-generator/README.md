@@ -16,7 +16,7 @@ W środowisku VisiLogic ręczne wprowadzanie setek etykiet zmiennych, bitów pom
 ### Struktura katalogów pakietu:
 
 ```
-narzedzia/generator operands/
+operands-generator/
 ├── templates/
 │   └── template_operands.csv       # Wzorcowa baza 8192 wierszy z nienaruszonymi opisami systemowymi SB/SI/SL/SDW
 ├── OperandsBuilder.ps1             # Obiektowy silnik generatora (klasa OperandsBuilder)

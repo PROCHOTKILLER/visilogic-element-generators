@@ -5,12 +5,21 @@
 # ==============================================================================
 
 param(
-    [string]$OutputDir = "$PSScriptRoot\..\dokumentacja",
+    [string]$OutputDir = "",
     [string]$HtmlFilename = "Instrukcja_Komora9_PLC_HMI.html",
     [string]$PdfFilename = "Instrukcja_Komora9_PLC_HMI.pdf"
 )
 
 $ErrorActionPreference = "Stop"
+
+if (-not $OutputDir) {
+    $docsCandidate = Join-Path $PSScriptRoot "..\docs"
+    if (Test-Path $docsCandidate) {
+        $OutputDir = $docsCandidate
+    } else {
+        $OutputDir = Join-Path $PSScriptRoot "..\dokumentacja"
+    }
+}
 
 $ResolvedOutputDir = (Resolve-Path $OutputDir).Path
 $HtmlPath = Join-Path $ResolvedOutputDir $HtmlFilename

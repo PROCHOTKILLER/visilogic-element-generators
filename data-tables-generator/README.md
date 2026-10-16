@@ -21,7 +21,7 @@ Ręczne "wyklikiwanie" dziesiątek kolumn, ustalanie ich rozmiarów, zakresów d
 ### Struktura katalogów pakietu:
 
 ```
-narzedzia/generator data tables/
+data-tables-generator/
 ├── templates/
 │   └── template_data_table.xml         # Czysty, wzorcowy szablon struktury Data Table XML
 ├── DataTableBuilder.ps1                # Obiektowy silnik generatora (klasy DataTableBuilder, DataTableDefinition, DataColumnDefinition)
