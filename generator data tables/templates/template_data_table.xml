@@ -1,0 +1,52 @@
+<PLC_DB>
+  <Table TABLE_ID="1">
+    <FieldsCount>3</FieldsCount>
+    <RowsCount>10</RowsCount>
+    <Description>Template_Table</Description>
+    <Column COL_ID="Column 0">
+      <FieldType>2</FieldType>
+      <Size>2</Size>
+      <ElementsCount>1</ElementsCount>
+      <Key>1</Key>
+      <StringLength>10</StringLength>
+      <ReadOnly>False</ReadOnly>
+      <PartOfProject>True</PartOfProject>
+      <FormatView>1</FormatView>
+      <MinValue>-32768</MinValue>
+      <MaxValue>32767</MaxValue>
+      <FormatView>1</FormatView>
+      <Description>Parametr_Integer</Description>
+      <ElementsDescriptions></ElementsDescriptions>
+    </Column>
+    <Column COL_ID="Column 1">
+      <FieldType>3</FieldType>
+      <Size>4</Size>
+      <ElementsCount>1</ElementsCount>
+      <Key>2</Key>
+      <StringLength>0</StringLength>
+      <ReadOnly>False</ReadOnly>
+      <PartOfProject>True</PartOfProject>
+      <FormatView>1</FormatView>
+      <MinValue>-2147483648</MinValue>
+      <MaxValue>2147483647</MaxValue>
+      <FormatView>1</FormatView>
+      <Description>Parametr_Long</Description>
+      <ElementsDescriptions></ElementsDescriptions>
+    </Column>
+    <Column COL_ID="Column 2">
+      <FieldType>6</FieldType>
+      <Size>16</Size>
+      <ElementsCount>1</ElementsCount>
+      <Key>3</Key>
+      <StringLength>16</StringLength>
+      <ReadOnly>False</ReadOnly>
+      <PartOfProject>True</PartOfProject>
+      <FormatView>1</FormatView>
+      <MinValue>-32768</MinValue>
+      <MaxValue>32767</MaxValue>
+      <FormatView>1</FormatView>
+      <Description>Nazwa_Kroku</Description>
+      <ElementsDescriptions></ElementsDescriptions>
+    </Column>
+  </Table>
+</PLC_DB>
