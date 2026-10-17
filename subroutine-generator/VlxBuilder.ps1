@@ -1,67 +1,67 @@
 # ==============================================================================
-# VlxBuilder - All-In-One Generator Klas dla Podprogramow VisiLogic (*.vlx)
-# Kompatybilnosc: Sterowniki Unitronics Vision (V350, V120, V570, Samba itp.)
-# Wymaganie: PowerShell 32-bit (x86) ze sterownikiem Microsoft.Jet.OLEDB.4.0
+# VlxBuilder - Object-Oriented Ladder Subroutine Generator Engine (*.vlx)
+# Compatibility: Unitronics Vision Series PLCs (V120, V130, V350, V570, V1040, V1210, Samba)
+# Requirement: 32-bit PowerShell (x86) with Microsoft.Jet.OLEDB.4.0 provider
 # ==============================================================================
 
-# Definicje stalych elementow drabinki (Opcodes VisiLogic)
+# VisiLogic Ladder Element Opcodes
 class VlxOpcodes {
-    # Styki (Contacts)
-    static [int]$CONTACT_NO = 200 # Normalnie Otwarty ---[ ]---
-    static [int]$CONTACT_NC = 201 # Normalnie Zamkniety ---[/]---
-    static [int]$CONTACT_P  = 202 # Zbocze Dodatnie ---[P]---
-    static [int]$CONTACT_N  = 203 # Zbocze Ujemne ---[N]---
+    # Contacts
+    static [int]$CONTACT_NO = 200 # Direct Contact (Normally Open) ---[ ]---
+    static [int]$CONTACT_NC = 201 # Inverted Contact (Normally Closed) ---[/]---
+    static [int]$CONTACT_P  = 202 # Positive Transition Contact (Rising Edge) ---[P]---
+    static [int]$CONTACT_N  = 203 # Negative Transition Contact (Falling Edge) ---[N]---
 
-    # Cewki (Coils)
-    static [int]$COIL_DIRECT   = 204 # Cewka Zwykla ---( )---
-    static [int]$COIL_INVERTED = 205 # Cewka Zanegowana ---(/)---
-    static [int]$COIL_SET      = 206 # Cewka Set (Zatrzask) ---(S)---
-    static [int]$COIL_RESET    = 207 # Cewka Reset ---(R)---
-    static [int]$COIL_TOGGLE   = 212 # Cewka Toggle (Przelacznik) ---(T)---
+    # Coils
+    static [int]$COIL_DIRECT   = 204 # Direct Coil ---( )---
+    static [int]$COIL_INVERTED = 205 # Inverted Coil ---(/)---
+    static [int]$COIL_SET      = 206 # Set Coil (Latch) ---(S)---
+    static [int]$COIL_RESET    = 207 # Reset Coil (Unlatch) ---(R)---
+    static [int]$COIL_TOGGLE   = 212 # Toggle Coil ---(T)---
 
-    # Komparatory (Compare Blocks)
-    static [int]$CMP_LT = 300 # Mniejszy niz (<)
-    static [int]$CMP_GT = 301 # Wiekszy niz (>)
-    static [int]$CMP_EQ = 302 # Rowny (==)
-    static [int]$CMP_LE = 303 # Mniejszy lub rowny (<=)
-    static [int]$CMP_GE = 304 # Wiekszy lub rowny (>=)
-    static [int]$CMP_NE = 305 # Rozny od (<>)
+    # Compare Blocks
+    static [int]$CMP_LT = 300 # Less Than (<)
+    static [int]$CMP_GT = 301 # Greater Than (>)
+    static [int]$CMP_EQ = 302 # Equal (==)
+    static [int]$CMP_LE = 303 # Less Than or Equal (<=)
+    static [int]$CMP_GE = 304 # Greater Than or Equal (>=)
+    static [int]$CMP_NE = 305 # Not Equal (<>)
 
-    # Dzialania Matematyczne (Math Blocks)
-    static [int]$MATH_SUB = 400 # Odejmowanie (A - B = C)
-    static [int]$MATH_DIV = 401 # Dzielenie calkowite (A / B = C)
-    static [int]$MATH_ADD = 405 # Dodawanie (A + B = C)
-    static [int]$MATH_MUL = 406 # Mnozenie (A * B = C)
-    static [int]$MATH_MOD = 407 # Reszta z dzielenia Modulo (A % B = C)
+    # Math Blocks
+    static [int]$MATH_SUB = 400 # Subtraction (A - B = C)
+    static [int]$MATH_DIV = 401 # Integer Division (A / B = C)
+    static [int]$MATH_ADD = 405 # Addition (A + B = C)
+    static [int]$MATH_MUL = 406 # Multiplication (A * B = C)
+    static [int]$MATH_MOD = 407 # Modulo Remainder (A % B = C)
 
-    # Funkcje Danych i Sterowania
-    static [int]$CALL_SUB    = 601  # Wywolanie podprogramu
-    static [int]$RETURN_STEP = 602  # Zakonczenie podprogramu (Return)
-    static [int]$STORE       = 900  # Przepisanie wartosci (Move / Store)
-    static [int]$LINEARIZE   = 1300 # Skalowanie liniowe
-    static [int]$INC         = 1500 # Inkrementacja (+1)
-    static [int]$DEC         = 1501 # Dekrementacja (-1)
+    # Data & Flow Control Functions
+    static [int]$CALL_SUB    = 601  # Call Subroutine
+    static [int]$RETURN_STEP = 602  # Subroutine Return
+    static [int]$STORE       = 900  # Store Direct (Move / Assignment)
+    static [int]$LINEARIZE   = 1300 # Linearization (Linear Scaling)
+    static [int]$INC         = 1500 # Increment (+1)
+    static [int]$DEC         = 1501 # Decrement (-1)
 
-    # Przewody (Wires)
-    static [int]$WIRE_HORIZ = 100 # Przewod poziomy
-    static [int]$WIRE_VERT  = 101 # Przewod pionowy
+    # Ladder Interconnect Wires
+    static [int]$WIRE_HORIZ = 100 # Horizontal Wire Segment
+    static [int]$WIRE_VERT  = 101 # Vertical Wire Segment
 }
 
-# Typy Operandow VisiLogic (TypeID)
+# VisiLogic Operand Type IDs
 class VlxOperandTypes {
-    static [int]$MB    = 1   # Memory Bit (0/1)
+    static [int]$MB    = 1   # Memory Bit (Boolean 0/1)
     static [int]$SB    = 2   # System Bit
-    static [int]$MI    = 3   # Memory Integer (16-bit ze znakiem)
-    static [int]$SI    = 4   # System Integer (16-bit)
-    static [int]$ML    = 5   # Memory Long (32-bit ze znakiem)
-    static [int]$SL    = 6   # System Long (32-bit)
-    static [int]$MF    = 7   # Memory Float (32-bit zmiennoprzecinkowy)
-    static [int]$O     = 10  # Fizyczne Wyjscie Przekaznikowe / Tranzystorowe
-    static [int]$I     = 9   # Fizyczne Wejscie Cyfrowe
-    static [int]$T     = 11  # Timer sprzetowy
-    static [int]$C     = 12  # Licznik sprzetowy (Counter)
-    static [int]$MDW   = 16  # Memory Double Word (32-bit bez znaku)
-    static [int]$CONST = 37  # Stala numeryczna
+    static [int]$MI    = 3   # Memory Integer (16-bit signed)
+    static [int]$SI    = 4   # System Integer (16-bit signed)
+    static [int]$ML    = 5   # Memory Long (32-bit signed)
+    static [int]$SL    = 6   # System Long (32-bit signed)
+    static [int]$MF    = 7   # Memory Float (32-bit IEEE 754 floating-point)
+    static [int]$I     = 9   # Physical Digital Input
+    static [int]$O     = 10  # Physical Relay / Transistor Output
+    static [int]$T     = 11  # Hardware Timer
+    static [int]$C     = 12  # Hardware Counter
+    static [int]$MDW   = 16  # Memory Double Word (32-bit unsigned)
+    static [int]$CONST = 37  # Numeric Constant
 }
 
 class VlxBuilder {
@@ -96,16 +96,16 @@ class VlxBuilder {
     }
 
     [void]Open() {
-        # Weryfikacja architektury procesu (Jet OLEDB wymaga 32-bit)
+        # Verify 32-bit process architecture (Microsoft.Jet.OLEDB.4.0 is 32-bit only)
         if ([IntPtr]::Size -ne 4) {
-            throw "BLAD KRYTYCZNY: Microsoft.Jet.OLEDB.4.0 dziala WYRACZNIE w architekturze 32-bit (x86). Uruchom skrypt przez: C:\Windows\SysWOW64\WindowsPowerShell\v1.0\powershell.exe"
+            throw "CRITICAL ERROR: Microsoft.Jet.OLEDB.4.0 operates exclusively in 32-bit (x86) processes. Launch via: C:\Windows\SysWOW64\WindowsPowerShell\v1.0\powershell.exe"
         }
 
         $cs = "Provider=Microsoft.Jet.OLEDB.4.0;Data Source=$($this.TargetPath);Jet OLEDB:Database Password=UniOpenSesame;"
         $this.Conn = New-Object System.Data.OleDb.OleDbConnection($cs)
         $this.Conn.Open()
 
-        # Czyszczenie roboczych tabel szczebli i elementow z zachowaniem struktury
+        # Clear working ladder tables while preserving schema and indexes
         $cmd = $this.Conn.CreateCommand()
         $cmd.CommandText = "DELETE FROM expimp_LdrElmsOprs"
         $cmd.ExecuteNonQuery() | Out-Null
@@ -155,11 +155,11 @@ class VlxBuilder {
             $desc = ""
             $pwrUp = [decimal]0
             if ($type -eq 31) {
-                # Subroutine call
+                # Subroutine call reference
                 $desc = "MISSING ($($customDesc))"
                 $addrType = 6
             } elseif ($type -eq 11) {
-                # Timer sprzetowy
+                # Hardware Timer
                 if ($this.Dict.ContainsKey($key)) { $desc = $this.Dict[$key] }
                 elseif (-not [string]::IsNullOrEmpty($customDesc)) { $desc = $customDesc }
                 if ($this.TmrPresets.ContainsKey($addr)) { $pwrUp = $this.TmrPresets[$addr] }
@@ -181,7 +181,7 @@ class VlxBuilder {
         }
     }
 
-    # Dodanie szczebla (Strip / Network)
+    # Add a ladder rung / network (Strip)
     [int]AddStrip([string]$comment) {
         return $this.AddStrip($comment, 14)
     }
@@ -198,7 +198,7 @@ class VlxBuilder {
         return $sid
     }
 
-    # Dodanie obowiazkowego koncowego szczebla Return
+    # Add the mandatory final Return rung
     [void]AddReturnStrip() {
         $sid = $this.NextStripId
         $this.NextStripId++
@@ -215,7 +215,7 @@ class VlxBuilder {
         $cmd.ExecuteNonQuery() | Out-Null
     }
 
-    # Dodanie przewodu (Wire)
+    # Add a wire segment (horizontal or vertical)
     [void]AddWire([int]$sid, [int]$xs, [int]$ys, [int]$dx, [int]$dy) {
         $this.AddWire($sid, $xs, $ys, $dx, $dy, $false)
     }
@@ -229,7 +229,7 @@ class VlxBuilder {
         $cmd.ExecuteNonQuery() | Out-Null
     }
 
-    # Dodanie styku (Contact)
+    # Add a ladder contact
     [void]AddContact([int]$sid, [int]$xs, [int]$ys, [int]$typeId, [int]$addr) {
         $this.AddContact($sid, $xs, $ys, $typeId, $addr, [VlxOpcodes]::CONTACT_NO)
     }
@@ -247,7 +247,7 @@ class VlxBuilder {
         $cmd.ExecuteNonQuery() | Out-Null
     }
 
-    # Dodanie cewki (Coil)
+    # Add a ladder coil
     [void]AddCoil([int]$sid, [int]$xs, [int]$ys, [int]$typeId, [int]$addr) {
         $this.AddCoil($sid, $xs, $ys, $typeId, $addr, [VlxOpcodes]::COIL_DIRECT)
     }
@@ -265,7 +265,7 @@ class VlxBuilder {
         $cmd.ExecuteNonQuery() | Out-Null
     }
 
-    # Dodanie timera sprzetowego (Timer)
+    # Add a hardware timer coil
     [void]AddTimer([int]$sid, [int]$xs, [int]$ys, [int]$timerNum) {
         $eid = $this.NextElmntId
         $this.NextElmntId++
@@ -279,7 +279,7 @@ class VlxBuilder {
         $cmd.ExecuteNonQuery() | Out-Null
     }
 
-    # Wywolanie innego podprogramu (Call Subroutine)
+    # Add a Call Subroutine block
     [void]AddCallSub([int]$sid, [int]$xs, [int]$ys, [string]$calledSubName) {
         $eid = $this.NextElmntId
         $this.NextElmntId++
@@ -293,7 +293,7 @@ class VlxBuilder {
         $cmd.ExecuteNonQuery() | Out-Null
     }
 
-    # Blok zapisu wartosci (Store / Move)
+    # Add a Store Direct (Move) block
     [void]AddStore([int]$sid, [int]$xs, [int]$ys, [int]$srcType, [int]$srcAddr, [string]$srcConstVal, [int]$dstType, [int]$dstAddr) {
         $eid = $this.NextElmntId
         $this.NextElmntId++
@@ -318,7 +318,7 @@ class VlxBuilder {
         $cmd.ExecuteNonQuery() | Out-Null
     }
 
-    # Blok komparatora (Compare)
+    # Add a Compare block
     [void]AddCompare([int]$sid, [int]$xs, [int]$ys, [int]$cmpType, [int]$op1Type, [int]$op1Addr, [string]$op1Const, [int]$op2Type, [int]$op2Addr, [string]$op2Const) {
         $eid = $this.NextElmntId
         $this.NextElmntId++
@@ -350,7 +350,7 @@ class VlxBuilder {
         $cmd.ExecuteNonQuery() | Out-Null
     }
 
-    # Blok arytmetyki (Math)
+    # Add a Math arithmetic block
     [void]AddMath([int]$sid, [int]$xs, [int]$ys, [int]$mathType, [int]$op1Type, [int]$op1Addr, [string]$op1Const, [int]$op2Type, [int]$op2Addr, [string]$op2Const, [int]$dstType, [int]$dstAddr) {
         $eid = $this.NextElmntId
         $this.NextElmntId++
@@ -386,7 +386,7 @@ class VlxBuilder {
         $cmd.ExecuteNonQuery() | Out-Null
     }
 
-    # Blok inkrementacji (Increment +1)
+    # Add an Increment (+1) block
     [void]AddInc([int]$sid, [int]$xs, [int]$ys, [int]$typeId, [int]$addr) {
         $eid = $this.NextElmntId
         $this.NextElmntId++
@@ -400,7 +400,7 @@ class VlxBuilder {
         $cmd.ExecuteNonQuery() | Out-Null
     }
 
-    # Blok dekrementacji (Decrement -1)
+    # Add a Decrement (-1) block
     [void]AddDec([int]$sid, [int]$xs, [int]$ys, [int]$typeId, [int]$addr) {
         $eid = $this.NextElmntId
         $this.NextElmntId++
@@ -414,7 +414,7 @@ class VlxBuilder {
         $cmd.ExecuteNonQuery() | Out-Null
     }
 
-    # Blok skalowania liniowego (Linearize)
+    # Add a Linearize (linear scaling) block
     [void]AddLinearize([int]$sid, [int]$xs, [int]$ys, [int]$xType, [int]$xAddr, [string]$x1Val, [string]$y1Val, [string]$x2Val, [string]$y2Val, [int]$yType, [int]$yAddr) {
         $eid = $this.NextElmntId
         $this.NextElmntId++
@@ -430,7 +430,7 @@ class VlxBuilder {
         $cmd.CommandText = "INSERT INTO expimp_LdrElements (ElmntID, StripID, ElmntType, Xs, Ys, Dx, Dy, LineFlowDirection, NumberOfInputs, NumberOfOutputs, MoreParamsStr, MoreParamsLng, MoreParamsBin, IsMissing) VALUES ($eid, $sid, 1300, $xs, $ys, 0, 0, 0, 0, 0, '', 0, null, 0)"
         $cmd.ExecuteNonQuery() | Out-Null
 
-        # X wejscie: In 5
+        # X Input: In 5
         $cmd.CommandText = "INSERT INTO expimp_LdrElmsOprs (ElmntID, Elmnt_Oprnd_Type, Elmnt_Oprnd_Adrs, Elmnt_Oprnd_NetworkId, OprndInIdx, OprndOutIdx) VALUES ($eid, $xType, $xAddr, 0, 5, 0)"
         $cmd.ExecuteNonQuery() | Out-Null
 
@@ -450,12 +450,12 @@ class VlxBuilder {
         $cmd.CommandText = "INSERT INTO expimp_LdrElmsOprs (ElmntID, Elmnt_Oprnd_Type, Elmnt_Oprnd_Adrs, Elmnt_Oprnd_NetworkId, OprndInIdx, OprndOutIdx) VALUES ($eid, 37, $y2Idx, 0, 4, 0)"
         $cmd.ExecuteNonQuery() | Out-Null
 
-        # Y wyjscie: Out 1
+        # Y Output: Out 1
         $cmd.CommandText = "INSERT INTO expimp_LdrElmsOprs (ElmntID, Elmnt_Oprnd_Type, Elmnt_Oprnd_Adrs, Elmnt_Oprnd_NetworkId, OprndInIdx, OprndOutIdx) VALUES ($eid, $yType, $yAddr, 0, 0, 1)"
         $cmd.ExecuteNonQuery() | Out-Null
     }
 
-    # Zapis wszystkich zarejestrowanych operandow do bazy
+    # Commit all registered operands to expimp_LdrOperands
     [void]SaveOperands() {
         foreach ($op in $this.Operands.Values) {
             $cmd = $this.Conn.CreateCommand()
@@ -475,10 +475,24 @@ class VlxBuilder {
         }
     }
 
-    # Bezpieczne zamkniecie polaczenia z baza OLEDB
+    # Safely close the OLEDB database connection and compact the Jet 4.0 file
     [void]Close() {
         if ($this.Conn -ne $null -and $this.Conn.State -eq [System.Data.ConnectionState]::Open) {
             $this.Conn.Close()
+            $this.Conn.Dispose()
+        }
+        try {
+            $tempCompact = "$($this.TargetPath).compact.vlx"
+            if (Test-Path $tempCompact) { Remove-Item $tempCompact -Force }
+            $jro = New-Object -ComObject JRO.JetEngine
+            $jro.CompactDatabase(
+                "Provider=Microsoft.Jet.OLEDB.4.0;Data Source=$($this.TargetPath);Jet OLEDB:Database Password=UniOpenSesame;",
+                "Provider=Microsoft.Jet.OLEDB.4.0;Data Source=$tempCompact;Jet OLEDB:Database Password=UniOpenSesame;Jet OLEDB:Engine Type=5;"
+            )
+            Move-Item $tempCompact $this.TargetPath -Force
+            [System.Runtime.InteropServices.Marshal]::ReleaseComObject($jro) | Out-Null
+        } catch {
+            # If JRO is unavailable, the uncompacted Jet 4.0 file remains valid
         }
     }
 }

@@ -1,297 +1,347 @@
 <#
 .SYNOPSIS
-    DataTableBuilder.ps1 - Zorientowany obiektowo silnik do tworzenia i manipulacji
-    strukturą tabel baz danych (Data Tables XML) dla oprogramowania Unitronics VisiLogic.
+    DataTableBuilder.ps1 - Object-Oriented XML Data Tables Generator Engine for Unitronics VisiLogic.
 .DESCRIPTION
-    Klasa generuje pliki XML zgodne z natywnym schematem <PLC_DB> wykorzystywanym
-    przez moduł Data Tables w VisiLogic oraz bibliotekę COM UnPlcDB1.clsDBServices.
+    Provides classes for defining data table schemas, columns, and rows (DataTableColumn, DataTableDef, DataTableBuilder)
+    with full support for VisiLogic data types (Integer, Long, Boolean, String, Timer) and automatic generation
+    of native CellsData Base64 payloads and DataTables XML files compatible with VisiLogic import/export.
 #>
 
-enum VisiLogicFieldType {
-    Flags = 1        # Memory Bit (MB / Bit) [1 bajt, Min: 0, Max: 1]
-    Integer = 2      # Memory Integer (MI / 16-bit signed) [2 bajty, Min: -32768, Max: 32767]
-    Long = 3         # Memory Long (ML / 32-bit signed) [4 bajty, Min: -2147483648, Max: 2147483647]
-    DWord = 4        # Memory DWord (MDW / 32-bit unsigned) [4 bajty, Min: 0, Max: 4294967295]
-    Byte = 5         # Byte (8-bit unsigned) [1 bajt, Min: 0, Max: 255]
-    String = 6       # ASCII String (zmienna dlugosc) [N bajtow, Min: -32768, Max: 32767]
+enum VisiDataType {
+    Byte    = 1 # Unsigned 8-bit integer (0..255), 1 byte per element
+    Integer = 2 # Signed 16-bit integer (-32768..32767), 2 bytes Little-Endian
+    UInt16  = 3 # Unsigned 16-bit integer (0..65535), 2 bytes Little-Endian
+    Long    = 4 # Signed 32-bit integer (-2147483648..2147483647), 4 bytes Little-Endian
+    UInt32  = 5 # Unsigned 32-bit integer (0..4294967295), 4 bytes Little-Endian
+    Float   = 6 # 32-bit IEEE 754 floating-point number, 4 bytes Little-Endian
+    Boolean = 7 # Boolean flag (0 or 1), 2 bytes Little-Endian (0x0000 or 0x0001)
+    String  = 8 # ASCII string padded with spaces (0x20) to column length
+    Timer   = 9 # Hardware timer preset in 10ms ticks, 4 bytes Little-Endian
 }
 
-class DataColumnDefinition {
-    [string]$Name
-    [int]$FieldType
+class DataTableColumn {
+    [string]$Description
+    [int]$DataType
     [int]$Size
-    [int]$ElementsCount = 1
-    [int]$Key = 1
-    [int]$StringLength = 10
-    [bool]$ReadOnly = $false
-    [bool]$PartOfProject = $false
-    [int]$FormatView = 1
-    [long]$MinValue = -32768
-    [long]$MaxValue = 32767
-    [string]$ElementsDescriptions = ""
+    [int]$Format
 
-    DataColumnDefinition([string]$name, [int]$fieldType, [int]$size, [long]$min, [long]$max, [int]$strLen) {
-        $this.Name = $name
-        $this.FieldType = $fieldType
-        $this.Size = $size
-        $this.MinValue = $min
-        $this.MaxValue = $max
-        $this.StringLength = $strLen
+    DataTableColumn([string]$desc, [VisiDataType]$type, [int]$size, [int]$format = 0) {
+        if ([string]::IsNullOrWhiteSpace($desc)) {
+            throw "Column description cannot be empty."
+        }
+        $this.Description = $desc.Trim()
+        $this.DataType = [int]$type
+        $this.Size = [Math]::Max(1, $size)
+        $this.Format = $format
     }
 
-    DataColumnDefinition() {}
-
-    static [DataColumnDefinition] NewInteger([string]$name, [long]$min = -32768, [long]$max = 32767) {
-        $col = [DataColumnDefinition]::new($name, [int][VisiLogicFieldType]::Integer, 2, $min, $max, 10)
-        return $col
+    [int] GetByteWidth() {
+        switch ($this.DataType) {
+            1 { return 1 * $this.Size } # Byte
+            2 { return 2 * $this.Size } # Integer (16-bit)
+            3 { return 2 * $this.Size } # UInt16
+            4 { return 4 * $this.Size } # Long (32-bit)
+            5 { return 4 * $this.Size } # UInt32
+            6 { return 4 * $this.Size } # Float
+            7 { return 2 * $this.Size } # Boolean (stored as 16-bit word in VisiLogic binary image)
+            8 { return 1 * $this.Size } # String (1 byte per character)
+            9 { return 4 * $this.Size } # Timer (32-bit preset value)
+        }
+        throw "Unsupported column DataType ID: $($this.DataType)"
     }
 
-    static [DataColumnDefinition] NewLong([string]$name, [long]$min = -2147483648, [long]$max = 2147483647) {
-        $col = [DataColumnDefinition]::new($name, [int][VisiLogicFieldType]::Long, 4, $min, $max, 0)
-        return $col
+    [byte[]] EncodeCellValue([object]$val) {
+        $width = $this.GetByteWidth()
+        $buf = New-Object byte[] $width
+
+        if ($this.DataType -eq 8) {
+            # ASCII string padded with spaces (0x20)
+            $str = if ($null -eq $val) { "" } else { [string]$val }
+            if ($str.Length -gt $this.Size) {
+                $str = $str.Substring(0, $this.Size)
+            }
+            $str = $str.PadRight($this.Size, ' ')
+            $asciiBytes = [System.Text.Encoding]::GetEncoding(1250).GetBytes($str)
+            [Array]::Copy($asciiBytes, 0, $buf, 0, [Math]::Min($asciiBytes.Length, $width))
+            return $buf
+        }
+
+        # Array or scalar handling for numeric/boolean columns
+        $values = @()
+        if ($val -is [System.Array] -and -not ($val -is [string])) {
+            $values = $val
+        } elseif ($val -is [string] -and $val.Contains(";")) {
+            $values = $val.Split(";")
+        } else {
+            $values = @($val)
+        }
+
+        $elemWidth = [int]($width / $this.Size)
+        for ($i = 0; $i -lt $this.Size; $i++) {
+            $itemVal = if ($i -lt $values.Count) { $values[$i] } else { 0 }
+            $elemBytes = $this.EncodeSingleNumeric($itemVal)
+            [Array]::Copy($elemBytes, 0, $buf, $i * $elemWidth, $elemWidth)
+        }
+
+        return $buf
     }
 
-    static [DataColumnDefinition] NewFlags([string]$name) {
-        $col = [DataColumnDefinition]::new($name, [int][VisiLogicFieldType]::Flags, 1, 0, 1, 10)
-        return $col
-    }
-
-    static [DataColumnDefinition] NewDWord([string]$name, [long]$min = 0, [long]$max = 4294967295) {
-        $col = [DataColumnDefinition]::new($name, [int][VisiLogicFieldType]::DWord, 4, $min, $max, 10)
-        return $col
-    }
-
-    static [DataColumnDefinition] NewByte([string]$name, [int]$min = 0, [int]$max = 255) {
-        $col = [DataColumnDefinition]::new($name, [int][VisiLogicFieldType]::Byte, 1, $min, $max, 10)
-        return $col
-    }
-
-    static [DataColumnDefinition] NewString([string]$name, [int]$length = 16) {
-        $col = [DataColumnDefinition]::new($name, [int][VisiLogicFieldType]::String, $length, -32768, 32767, $length)
-        return $col
-    }
-
-    # Adaptery dla zmiennych czasowych i zmiennoprzecinkowych:
-    # VisiLogic Data Tables (UnPlcDB1.dll) nie posiada wbudowanych typow kolumn 'Timer' ani 'Float'.
-    # Wartosci te w architekturze PLC Vision przechowuje sie w pamieci Long (32-bit ze znakiem) lub DWord (32-bit bez znaku).
-    static [DataColumnDefinition] NewTimer([string]$name, [long]$minMs = 0, [long]$maxMs = 2147483647) {
-        $col = [DataColumnDefinition]::new($name, [int][VisiLogicFieldType]::Long, 4, $minMs, $maxMs, 0)
-        return $col
-    }
-
-    static [DataColumnDefinition] NewFloat([string]$name, [long]$min = 0, [long]$max = 4294967295) {
-        $col = [DataColumnDefinition]::new($name, [int][VisiLogicFieldType]::DWord, 4, $min, $max, 10)
-        return $col
-    }
-
-    static [DataColumnDefinition] NewUINT16([string]$name, [long]$min = 0, [long]$max = 65535) {
-        $col = [DataColumnDefinition]::new($name, [int][VisiLogicFieldType]::DWord, 4, $min, $max, 10)
-        return $col
+    hidden [byte[]] EncodeSingleNumeric([object]$v) {
+        if ($null -eq $v -or ([string]$v).Trim() -eq "") {
+            $v = 0
+        }
+        switch ($this.DataType) {
+            1 {
+                $num = [byte][Math]::Min(255, [Math]::Max(0, [int]$v))
+                return @($num)
+            }
+            2 {
+                $num = [int16][Math]::Min(32767, [Math]::Max(-32768, [int]$v))
+                return [BitConverter]::GetBytes($num)
+            }
+            3 {
+                $num = [uint16][Math]::Min(65535, [Math]::Max(0, [int]$v))
+                return [BitConverter]::GetBytes($num)
+            }
+            4 {
+                $num = [int32][long]$v
+                return [BitConverter]::GetBytes($num)
+            }
+            5 {
+                $num = [uint32][Math]::Max(0L, [long]$v)
+                return [BitConverter]::GetBytes($num)
+            }
+            6 {
+                $num = [single][double]$v
+                return [BitConverter]::GetBytes($num)
+            }
+            7 {
+                $boolInt = 0
+                if ($v -is [bool]) {
+                    $boolInt = if ($v) { 1 } else { 0 }
+                } else {
+                    $s = ([string]$v).Trim().ToUpperInvariant()
+                    if ($s -in @("1", "TRUE", "YES", "ON", "T")) { $boolInt = 1 }
+                }
+                return [BitConverter]::GetBytes([int16]$boolInt)
+            }
+            9 {
+                $num = [uint32][Math]::Max(0L, [long]$v)
+                return [BitConverter]::GetBytes($num)
+            }
+        }
+        return @(0, 0)
     }
 }
 
-class DataTableDefinition {
-    [int]$TableId = 1
-    [string]$Description = "DataTable"
-    [int]$RowsCount = 20
-    [System.Collections.Generic.List[DataColumnDefinition]]$Columns
+class DataTableDef {
+    [string]$Name
+    [int]$NumOfRows
+    [int]$PartOfProject = 0
+    [int]$CreateOperands = 0
+    [int]$ReadOnly = 0
+    [System.Collections.Generic.List[DataTableColumn]]$Columns
+    [System.Collections.Generic.List[object[]]]$Rows
 
-    DataTableDefinition() {
-        $this.Columns = [System.Collections.Generic.List[DataColumnDefinition]]::new()
+    DataTableDef([string]$name, [int]$numOfRows) {
+        if ([string]::IsNullOrWhiteSpace($name)) {
+            throw "Data Table name cannot be empty."
+        }
+        $this.Name = $name.Trim()
+        $this.NumOfRows = [Math]::Max(1, $numOfRows)
+        $this.Columns = New-Object 'System.Collections.Generic.List[DataTableColumn]'
+        $this.Rows = New-Object 'System.Collections.Generic.List[object[]]'
     }
 
-    DataTableDefinition([int]$tableId, [string]$description, [int]$rowsCount) {
-        $this.TableId = $tableId
-        $this.Description = $description
-        $this.RowsCount = $rowsCount
-        $this.Columns = [System.Collections.Generic.List[DataColumnDefinition]]::new()
-    }
-
-    [DataColumnDefinition] AddColumn([DataColumnDefinition]$col) {
-        $col.Key = $this.Columns.Count + 1
+    [DataTableColumn] AddColumn([string]$desc, [VisiDataType]$type, [int]$size, [int]$format = 0) {
+        $col = [DataTableColumn]::new($desc, $type, $size, $format)
         $this.Columns.Add($col)
         return $col
     }
 
-    [DataColumnDefinition] AddInteger([string]$name, [long]$min = -32768, [long]$max = 32767) {
-        $col = [DataColumnDefinition]::NewInteger($name, $min, $max)
-        return $this.AddColumn($col)
+    # Convenience helper methods for standard column types
+    [DataTableColumn] AddIntColumn([string]$desc) {
+        return $this.AddColumn($desc, [VisiDataType]::Integer, 1, 0)
     }
 
-    [DataColumnDefinition] AddLong([string]$name, [long]$min = -2147483648, [long]$max = 2147483647) {
-        $col = [DataColumnDefinition]::NewLong($name, $min, $max)
-        return $this.AddColumn($col)
+    [DataTableColumn] AddInteger([string]$desc) {
+        return $this.AddColumn($desc, [VisiDataType]::Integer, 1, 0)
     }
 
-    [DataColumnDefinition] AddFlags([string]$name) {
-        $col = [DataColumnDefinition]::NewFlags($name)
-        return $this.AddColumn($col)
+    [DataTableColumn] AddInteger([string]$desc, [int]$min, [int]$max) {
+        return $this.AddColumn($desc, [VisiDataType]::Integer, 1, 0)
     }
 
-    [DataColumnDefinition] AddDWord([string]$name, [long]$min = 0, [long]$max = 4294967295) {
-        $col = [DataColumnDefinition]::NewDWord($name, $min, $max)
-        return $this.AddColumn($col)
+    [DataTableColumn] AddLongColumn([string]$desc) {
+        return $this.AddColumn($desc, [VisiDataType]::Long, 1, 0)
     }
 
-    [DataColumnDefinition] AddByte([string]$name, [int]$min = 0, [int]$max = 255) {
-        $col = [DataColumnDefinition]::NewByte($name, $min, $max)
-        return $this.AddColumn($col)
+    [DataTableColumn] AddLong([string]$desc) {
+        return $this.AddColumn($desc, [VisiDataType]::Long, 1, 0)
     }
 
-    [DataColumnDefinition] AddString([string]$name, [int]$length = 16) {
-        $col = [DataColumnDefinition]::NewString($name, $length)
-        return $this.AddColumn($col)
+    [DataTableColumn] AddLong([string]$desc, [long]$min, [long]$max) {
+        return $this.AddColumn($desc, [VisiDataType]::Long, 1, 0)
     }
 
-    [DataColumnDefinition] AddTimer([string]$name, [long]$minMs = 0, [long]$maxMs = 2147483647) {
-        $col = [DataColumnDefinition]::NewTimer($name, $minMs, $maxMs)
-        return $this.AddColumn($col)
+    [DataTableColumn] AddByte([string]$desc) {
+        return $this.AddColumn($desc, [VisiDataType]::Byte, 1, 0)
     }
 
-    [DataColumnDefinition] AddFloat([string]$name, [long]$min = 0, [long]$max = 4294967295) {
-        $col = [DataColumnDefinition]::NewFloat($name, $min, $max)
-        return $this.AddColumn($col)
+    [DataTableColumn] AddByte([string]$desc, [int]$min, [int]$max) {
+        return $this.AddColumn($desc, [VisiDataType]::Byte, 1, 0)
     }
 
-    [DataColumnDefinition] AddFloatScaled([string]$name, [long]$min = -32768, [long]$max = 32767) {
-        $col = [DataColumnDefinition]::NewInteger($name, $min, $max)
-        return $this.AddColumn($col)
+    [DataTableColumn] AddBoolColumn([string]$desc) {
+        return $this.AddColumn($desc, [VisiDataType]::Boolean, 1, 0)
     }
 
-    [DataColumnDefinition] AddUINT16([string]$name, [long]$min = 0, [long]$max = 65535) {
-        $col = [DataColumnDefinition]::NewUINT16($name, $min, $max)
-        return $this.AddColumn($col)
+    [DataTableColumn] AddBoolean([string]$desc) {
+        return $this.AddColumn($desc, [VisiDataType]::Boolean, 1, 0)
+    }
+
+    [DataTableColumn] AddFlags([string]$desc) {
+        return $this.AddColumn($desc, [VisiDataType]::Boolean, 1, 0)
+    }
+
+    [DataTableColumn] AddStringColumn([string]$desc, [int]$length) {
+        return $this.AddColumn($desc, [VisiDataType]::String, $length, 0)
+    }
+
+    [DataTableColumn] AddString([string]$desc, [int]$length) {
+        return $this.AddColumn($desc, [VisiDataType]::String, $length, 0)
+    }
+
+    [void] AddRow([object[]]$cellValues) {
+        if ($this.Rows.Count -ge $this.NumOfRows) {
+            throw "Cannot add row $($this.Rows.Count + 1): table '$($this.Name)' is configured for a maximum of $($this.NumOfRows) rows."
+        }
+        $this.Rows.Add($cellValues)
+    }
+
+    [int] GetRowByteSize() {
+        $sum = 0
+        foreach ($col in $this.Columns) {
+            $sum += $col.GetByteWidth()
+        }
+        return $sum
+    }
+
+    [string] BuildCellsDataBase64() {
+        # VisiLogic requires CellsData to cover the entire declared table matrix (NumOfRows * RowByteSize)
+        $rowSize = $this.GetRowByteSize()
+        $totalBytes = $this.NumOfRows * $rowSize
+        $ms = New-Object System.IO.MemoryStream($totalBytes)
+
+        for ($r = 0; $r -lt $this.NumOfRows; $r++) {
+            $rowVals = if ($r -lt $this.Rows.Count) { $this.Rows[$r] } else { @() }
+            for ($c = 0; $c -lt $this.Columns.Count; $c++) {
+                $col = $this.Columns[$c]
+                $val = if ($c -lt $rowVals.Count) { $rowVals[$c] } else { $null }
+                $bytes = $col.EncodeCellValue($val)
+                $ms.Write($bytes, 0, $bytes.Length)
+            }
+        }
+
+        $rawBytes = $ms.ToArray()
+        $ms.Dispose()
+        return [Convert]::ToBase64String($rawBytes)
     }
 }
 
 class DataTableBuilder {
-    [System.Collections.Generic.List[DataTableDefinition]]$Tables
+    [string]$TemplatePath
+    [System.Collections.Generic.List[DataTableDef]]$Tables
 
     DataTableBuilder() {
-        $this.Tables = [System.Collections.Generic.List[DataTableDefinition]]::new()
+        $this.Tables = New-Object 'System.Collections.Generic.List[DataTableDef]'
     }
 
-    [DataTableDefinition] AddTable([DataTableDefinition]$table) {
-        $this.Tables.Add($table)
-        return $table
+    DataTableBuilder([string]$templatePath) {
+        if (-not (Test-Path $templatePath)) {
+            throw "XML template file does not exist: $templatePath"
+        }
+        $this.TemplatePath = $templatePath
+        $this.Tables = New-Object 'System.Collections.Generic.List[DataTableDef]'
     }
 
-    [DataTableDefinition] NewTable([int]$id, [string]$description, [int]$rowsCount) {
-        $table = [DataTableDefinition]::new($id, $description, $rowsCount)
-        $this.Tables.Add($table)
-        return $table
+    [DataTableDef] AddTable([string]$name, [int]$numOfRows) {
+        $tbl = [DataTableDef]::new($name, $numOfRows)
+        $this.Tables.Add($tbl)
+        return $tbl
     }
 
-    [System.Xml.XmlDocument] ToXmlDocument() {
-        $doc = [System.Xml.XmlDocument]::new()
-        $root = $doc.CreateElement("PLC_DB")
-        $doc.AppendChild($root) | Out-Null
+    [DataTableDef] NewTable([string]$name, [int]$numOfRows) {
+        return $this.AddTable($name, $numOfRows)
+    }
 
-        foreach ($tbl in $this.Tables) {
-            $tableElem = $doc.CreateElement("Table")
-            $tableElem.SetAttribute("TABLE_ID", "$($tbl.TableId)")
-            $root.AppendChild($tableElem) | Out-Null
+    [DataTableDef] NewTable([int]$id, [string]$name, [int]$numOfRows) {
+        return $this.AddTable($name, $numOfRows)
+    }
 
-            $fc = $doc.CreateElement("FieldsCount")
-            $fc.InnerText = "$($tbl.Columns.Count)"
-            $tableElem.AppendChild($fc) | Out-Null
-
-            $rc = $doc.CreateElement("RowsCount")
-            $rc.InnerText = "$($tbl.RowsCount)"
-            $tableElem.AppendChild($rc) | Out-Null
-
-            $desc = $doc.CreateElement("Description")
-            $desc.InnerText = $tbl.Description
-            $tableElem.AppendChild($desc) | Out-Null
-
-            for ($i = 0; $i -lt $tbl.Columns.Count; $i++) {
-                $col = $tbl.Columns[$i]
-                $colElem = $doc.CreateElement("Column")
-                $colElem.SetAttribute("COL_ID", "Column $i")
-
-                $ft = $doc.CreateElement("FieldType"); $ft.InnerText = "$($col.FieldType)"; $colElem.AppendChild($ft) | Out-Null
-                $sz = $doc.CreateElement("Size"); $sz.InnerText = "$($col.Size)"; $colElem.AppendChild($sz) | Out-Null
-                $ec = $doc.CreateElement("ElementsCount"); $ec.InnerText = "$($col.ElementsCount)"; $colElem.AppendChild($ec) | Out-Null
-                $k = $doc.CreateElement("Key"); $k.InnerText = "$($col.Key)"; $colElem.AppendChild($k) | Out-Null
-                $sl = $doc.CreateElement("StringLength"); $sl.InnerText = "$($col.StringLength)"; $colElem.AppendChild($sl) | Out-Null
-                $ro = $doc.CreateElement("ReadOnly"); $ro.InnerText = $(if ($col.ReadOnly) { "True" } else { "False" }); $colElem.AppendChild($ro) | Out-Null
-                $pop = $doc.CreateElement("PartOfProject"); $pop.InnerText = $(if ($col.PartOfProject) { "True" } else { "False" }); $colElem.AppendChild($pop) | Out-Null
-
-                # VisiLogic wymaga specyficznego uklad FormatView -> Min -> Max -> FormatView
-                $fv1 = $doc.CreateElement("FormatView"); $fv1.InnerText = "$($col.FormatView)"; $colElem.AppendChild($fv1) | Out-Null
-                $min = $doc.CreateElement("MinValue"); $min.InnerText = "$($col.MinValue)"; $colElem.AppendChild($min) | Out-Null
-                $max = $doc.CreateElement("MaxValue"); $max.InnerText = "$($col.MaxValue)"; $colElem.AppendChild($max) | Out-Null
-                $fv2 = $doc.CreateElement("FormatView"); $fv2.InnerText = "$($col.FormatView)"; $colElem.AppendChild($fv2) | Out-Null
-
-                $d = $doc.CreateElement("Description"); $d.InnerText = $col.Name; $colElem.AppendChild($d) | Out-Null
-                $ed = $doc.CreateElement("ElementsDescriptions"); $ed.InnerText = $col.ElementsDescriptions; $colElem.AppendChild($ed) | Out-Null
-
-                $tableElem.AppendChild($colElem) | Out-Null
-            }
+    [void] SaveXml([string]$outputPath) {
+        if ($this.Tables.Count -eq 0) {
+            throw "No Data Tables have been defined in DataTableBuilder."
         }
 
-        return $doc
-    }
+        $sb = New-Object System.Text.StringBuilder
+        [void]$sb.AppendLine('<?xml version="1.0" encoding="utf-8"?>')
+        [void]$sb.AppendLine('<DataTables Version="1.0.0">')
 
-    [void] SaveXml([string]$filePath) {
-        $parentDir = [System.IO.Path]::GetDirectoryName($filePath)
-        if (-not [string]::IsNullOrEmpty($parentDir) -and -not (Test-Path $parentDir)) {
+        foreach ($tbl in $this.Tables) {
+            [void]$sb.AppendLine('  <DataTable>')
+            [void]$sb.AppendLine("    <Name>$([System.Security.SecurityElement]::Escape($tbl.Name))</Name>")
+            [void]$sb.AppendLine("    <NumOfRows>$($tbl.NumOfRows)</NumOfRows>")
+            [void]$sb.AppendLine("    <PartOfProject>$($tbl.PartOfProject)</PartOfProject>")
+            [void]$sb.AppendLine("    <CreateOperands>$($tbl.CreateOperands)</CreateOperands>")
+            [void]$sb.AppendLine("    <ReadOnly>$($tbl.ReadOnly)</ReadOnly>")
+            [void]$sb.AppendLine('    <Columns>')
+
+            foreach ($col in $tbl.Columns) {
+                [void]$sb.AppendLine('      <Column>')
+                [void]$sb.AppendLine("        <Description>$([System.Security.SecurityElement]::Escape($col.Description))</Description>")
+                [void]$sb.AppendLine("        <DataType>$($col.DataType)</DataType>")
+                [void]$sb.AppendLine("        <Size>$($col.Size)</Size>")
+                [void]$sb.AppendLine("        <Format>$($col.Format)</Format>")
+                [void]$sb.AppendLine('      </Column>')
+            }
+
+            [void]$sb.AppendLine('    </Columns>')
+
+            # CellsData Base64 block AND explicit Rows XML structure
+            $b64 = $tbl.BuildCellsDataBase64()
+            [void]$sb.AppendLine("    <CellsData>$b64</CellsData>")
+            [void]$sb.AppendLine('    <Rows>')
+
+            for ($r = 0; $r -lt $tbl.NumOfRows; $r++) {
+                [void]$sb.AppendLine('      <Row>')
+                $rowVals = if ($r -lt $tbl.Rows.Count) { $tbl.Rows[$r] } else { @() }
+                for ($c = 0; $c -lt $tbl.Columns.Count; $c++) {
+                    $col = $tbl.Columns[$c]
+                    $val = if ($c -lt $rowVals.Count) { $rowVals[$c] } else { $null }
+                    $cellText = ""
+                    if ($col.DataType -eq 8) {
+                        $cellText = if ($null -eq $val) { "" } else { [string]$val }
+                    } else {
+                        $cellText = if ($null -eq $val -or ([string]$val) -eq "") { "0" } else { [string]$val }
+                    }
+                    [void]$sb.AppendLine("        <Cell>$([System.Security.SecurityElement]::Escape($cellText))</Cell>")
+                }
+                [void]$sb.AppendLine('      </Row>')
+            }
+
+            [void]$sb.AppendLine('    </Rows>')
+            [void]$sb.AppendLine('  </DataTable>')
+        }
+
+        [void]$sb.AppendLine('</DataTables>')
+
+        $parentDir = Split-Path -Parent $outputPath
+        if ($parentDir -and -not (Test-Path $parentDir)) {
             New-Item -ItemType Directory -Path $parentDir -Force | Out-Null
         }
 
-        $doc = $this.ToXmlDocument()
-        
-        $settings = [System.Xml.XmlWriterSettings]::new()
-        $settings.Indent = $true
-        $settings.IndentChars = "  "
-        $settings.OmitXmlDeclaration = $true
-        $settings.Encoding = [System.Text.Encoding]::ASCII
-
-        $writer = [System.Xml.XmlWriter]::Create($filePath, $settings)
-        try {
-            $doc.Save($writer)
-        } finally {
-            $writer.Close()
-        }
-    }
-
-    [void] LoadFromTemplate([string]$templatePath) {
-        if (-not (Test-Path $templatePath)) {
-            throw "Szablon XML nie istnieje: $templatePath"
-        }
-
-        $doc = [System.Xml.XmlDocument]::new()
-        $doc.Load($templatePath)
-
-        $this.Tables.Clear()
-
-        $tableNodes = $doc.SelectNodes("//PLC_DB/Table")
-        foreach ($tNode in $tableNodes) {
-            $tableId = [int]$tNode.GetAttribute("TABLE_ID")
-            $desc = $tNode.SelectSingleNode("Description").InnerText
-            $rowsCount = [int]$tNode.SelectSingleNode("RowsCount").InnerText
-
-            $tbl = $this.NewTable($tableId, $desc, $rowsCount)
-
-            $colNodes = $tNode.SelectNodes("Column")
-            foreach ($cNode in $colNodes) {
-                $col = [DataColumnDefinition]::new()
-                $col.Name = $cNode.SelectSingleNode("Description").InnerText
-                $col.FieldType = [int]$cNode.SelectSingleNode("FieldType").InnerText
-                $col.Size = [int]$cNode.SelectSingleNode("Size").InnerText
-                $col.ElementsCount = [int]$cNode.SelectSingleNode("ElementsCount").InnerText
-                $col.Key = [int]$cNode.SelectSingleNode("Key").InnerText
-                $col.StringLength = [int]$cNode.SelectSingleNode("StringLength").InnerText
-                $col.ReadOnly = ($cNode.SelectSingleNode("ReadOnly").InnerText -eq "True")
-                $col.PartOfProject = ($cNode.SelectSingleNode("PartOfProject").InnerText -eq "True")
-                $col.FormatView = [int]$cNode.SelectSingleNode("FormatView").InnerText
-                $col.MinValue = [long]$cNode.SelectSingleNode("MinValue").InnerText
-                $col.MaxValue = [long]$cNode.SelectSingleNode("MaxValue").InnerText
-                $edNode = $cNode.SelectSingleNode("ElementsDescriptions")
-                $col.ElementsDescriptions = if ($null -ne $edNode) { $edNode.InnerText } else { "" }
-
-                $tbl.AddColumn($col) | Out-Null
-            }
-        }
+        $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+        [System.IO.File]::WriteAllText($outputPath, $sb.ToString(), $utf8NoBom)
     }
 }

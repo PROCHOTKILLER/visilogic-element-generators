@@ -54,7 +54,7 @@ Inspection of native VisiLogic exports revealed that every data line terminates 
 A row with 18 fields contains 18 commas, resulting in a 19th empty element when split by standard delimiter functions. Parsers that do not anticipate this quirk flag false column-count mismatches.
 
 ### 2.3. Character Encoding (Windows-1250 / ANSI vs UTF-8)
-Saving the CSV in UTF-8 (or UTF-8 with BOM) causes localized characters and accented symbols to display as garbled mojibake (e.g. `ZaĹ‚Ä…czenie` or replacement diamonds `?`).
+Saving the CSV in UTF-8 (or UTF-8 with BOM) causes localized characters and engineering symbols to display as garbled mojibake (e.g. `Â°C`, `ÂµS`, or replacement diamonds `?`).
 - VisiLogic is a 32-bit legacy Win32 application that does not decode UTF-8 in its operand database.
 - It expects single-byte ANSI encoding matching the regional Windows locale (**Windows-1250 / CP1250** for Central and Eastern Europe).
 - `OperandsBuilder.ps1` forces stream writes using `[System.Text.Encoding]::GetEncoding(1250)`.

@@ -1,17 +1,17 @@
 <#
 .SYNOPSIS
-    Uniwersalny skrypt uruchomieniowy (CLI Wrapper) dla Generatora Podprogramow VisiLogic (*.vlx).
-    Automatycznie wykrywa architekture i w razie potrzeby przelacza sie na 32-bitowy PowerShell (SysWOW64).
+    Universal CLI Wrapper for the Unitronics VisiLogic Subroutine Generator (*.vlx).
+    Automatically detects process architecture and relaunches in 32-bit PowerShell (SysWOW64) when required.
 
 .DESCRIPTION
-    Narzedzie umozliwia latwe tworzenie lub kompilowanie podprogramow VisiLogic za pomoca silnika VlxBuilder.
-    Moze byc wywolywane bezposrednio przez inzyniera (czlowieka) lub autonomicznego agenta AI.
+    Enables creating or compiling VisiLogic ladder subroutines using the VlxBuilder engine.
+    Designed to be invoked directly by control engineers or automated AI agents.
 
 .PARAMETER ScriptPath
-    Sciezka do wlasnego skryptu budujacego podprogram (np. example_demo.ps1).
+    Path to a subroutine definition script (e.g., example_demo.ps1).
 
 .PARAMETER SubName
-    Nazwa podprogramu (jesli uzywany jest tryb interaktywny/prosty).
+    Subroutine name (when invoked in interactive/basic mode).
 
 .EXAMPLE
     .\generate_subroutine.ps1 -ScriptPath .\example_demo.ps1
@@ -22,9 +22,9 @@ param(
     [string]$SubName = ""
 )
 
-# 1. Automatyczne przelaczenie na 32-bitowy PowerShell (wymagany przez sterownik Microsoft Jet OLEDB 4.0)
+# 1. Automatic switch to 32-bit PowerShell (required by the Microsoft Jet OLEDB 4.0 driver)
 if ([IntPtr]::Size -eq 8) {
-    Write-Host "[INFO] Wykryto PowerShell 64-bit. Automatyczne uruchomienie w srodowisku 32-bit (SysWOW64)..." -ForegroundColor Yellow
+    Write-Host "[INFO] 64-bit PowerShell detected. Relaunching in 32-bit environment (SysWOW64)..." -ForegroundColor Yellow
     $sysWow64PowerShell = Join-Path $env:windir "SysWOW64\WindowsPowerShell\v1.0\powershell.exe"
     if (Test-Path $sysWow64PowerShell) {
         $argList = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "`"$PSCommandPath`"")
@@ -34,20 +34,20 @@ if ([IntPtr]::Size -eq 8) {
         $process = Start-Process -FilePath $sysWow64PowerShell -ArgumentList $argList -NoNewWindow -Wait -PassThru
         exit $process.ExitCode
     } else {
-        Write-Error "[BLAD] Nie znaleziono 32-bitowego PowerShell pod sciezka: $sysWow64PowerShell"
+        Write-Error "[ERROR] 32-bit PowerShell not found at: $sysWow64PowerShell"
         exit 1
     }
 }
 
 Write-Host "======================================================================" -ForegroundColor Cyan
-Write-Host "   GENERATOR PODPROGRAMOW VISILOGIC (*.VLX) - ALL-IN-ONE (AIO)        " -ForegroundColor Cyan
+Write-Host "   VISILOGIC SUBROUTINE GENERATOR (*.VLX) - ALL-IN-ONE (AIO)          " -ForegroundColor Cyan
 Write-Host "======================================================================" -ForegroundColor Cyan
 
 $currentDir = Split-Path -Parent $PSCommandPath
 $vlxBuilderFile = Join-Path $currentDir "VlxBuilder.ps1"
 
 if (-not (Test-Path $vlxBuilderFile)) {
-    Write-Error "[BLAD] Nie znaleziono biblioteki silnika: $vlxBuilderFile"
+    Write-Error "[ERROR] Engine library not found: $vlxBuilderFile"
     exit 1
 }
 
@@ -55,15 +55,15 @@ if (-not (Test-Path $vlxBuilderFile)) {
 
 if ($ScriptPath -ne "") {
     if (Test-Path $ScriptPath) {
-        Write-Host "[INFO] Uruchamianie dedykowanego skryptu definicji: $ScriptPath" -ForegroundColor Green
+        Write-Host "[INFO] Executing subroutine definition script: $ScriptPath" -ForegroundColor Green
         . $ScriptPath
         exit 0
     } else {
-        Write-Error "[BLAD] Podany plik skryptu nie istnieje: $ScriptPath"
+        Write-Error "[ERROR] Specified script file does not exist: $ScriptPath"
         exit 1
     }
 }
 
-Write-Host "[INFO] Tryb bazowy: Uruchomiono srodowisko VlxBuilder." -ForegroundColor Green
-Write-Host "Mozesz zaimportowac klase VlxBuilder do wlasnego skryptu PowerShell lub uruchomic:" -ForegroundColor Gray
+Write-Host "[INFO] Base mode: VlxBuilder environment initialized." -ForegroundColor Green
+Write-Host "Import the VlxBuilder class into your PowerShell script or run:" -ForegroundColor Gray
 Write-Host "  .\generate_subroutine.ps1 -ScriptPath .\example_demo.ps1" -ForegroundColor Yellow

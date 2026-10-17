@@ -1,52 +1,38 @@
-<PLC_DB>
-  <Table TABLE_ID="1">
-    <FieldsCount>3</FieldsCount>
-    <RowsCount>10</RowsCount>
-    <Description>Template_Table</Description>
-    <Column COL_ID="Column 0">
-      <FieldType>2</FieldType>
-      <Size>2</Size>
-      <ElementsCount>1</ElementsCount>
-      <Key>1</Key>
-      <StringLength>10</StringLength>
-      <ReadOnly>False</ReadOnly>
-      <PartOfProject>True</PartOfProject>
-      <FormatView>1</FormatView>
-      <MinValue>-32768</MinValue>
-      <MaxValue>32767</MaxValue>
-      <FormatView>1</FormatView>
-      <Description>Parametr_Integer</Description>
-      <ElementsDescriptions></ElementsDescriptions>
-    </Column>
-    <Column COL_ID="Column 1">
-      <FieldType>3</FieldType>
-      <Size>4</Size>
-      <ElementsCount>1</ElementsCount>
-      <Key>2</Key>
-      <StringLength>0</StringLength>
-      <ReadOnly>False</ReadOnly>
-      <PartOfProject>True</PartOfProject>
-      <FormatView>1</FormatView>
-      <MinValue>-2147483648</MinValue>
-      <MaxValue>2147483647</MaxValue>
-      <FormatView>1</FormatView>
-      <Description>Parametr_Long</Description>
-      <ElementsDescriptions></ElementsDescriptions>
-    </Column>
-    <Column COL_ID="Column 2">
-      <FieldType>6</FieldType>
-      <Size>16</Size>
-      <ElementsCount>1</ElementsCount>
-      <Key>3</Key>
-      <StringLength>16</StringLength>
-      <ReadOnly>False</ReadOnly>
-      <PartOfProject>True</PartOfProject>
-      <FormatView>1</FormatView>
-      <MinValue>-32768</MinValue>
-      <MaxValue>32767</MaxValue>
-      <FormatView>1</FormatView>
-      <Description>Nazwa_Kroku</Description>
-      <ElementsDescriptions></ElementsDescriptions>
-    </Column>
-  </Table>
-</PLC_DB>
+<?xml version="1.0" encoding="utf-8"?>
+<DataTables Version="1.0.0">
+  <DataTable>
+    <Name>Template_Table</Name>
+    <NumOfRows>1</NumOfRows>
+    <PartOfProject>0</PartOfProject>
+    <CreateOperands>0</CreateOperands>
+    <ReadOnly>0</ReadOnly>
+    <Columns>
+      <Column>
+        <Description>Param_Integer</Description>
+        <DataType>2</DataType>
+        <Size>1</Size>
+        <Format>0</Format>
+      </Column>
+      <Column>
+        <Description>Param_Long</Description>
+        <DataType>4</DataType>
+        <Size>1</Size>
+        <Format>0</Format>
+      </Column>
+      <Column>
+        <Description>Step_Name</Description>
+        <DataType>8</DataType>
+        <Size>16</Size>
+        <Format>0</Format>
+      </Column>
+    </Columns>
+    <CellsData>AAAAAAAAAAAAAAAAICAgICAgICAgICAgICAgIA==</CellsData>
+    <Rows>
+      <Row>
+        <Cell>0</Cell>
+        <Cell>0</Cell>
+        <Cell></Cell>
+      </Row>
+    </Rows>
+  </DataTable>
+</DataTables>

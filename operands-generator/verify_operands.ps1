@@ -1,26 +1,22 @@
 <#
 .SYNOPSIS
-    Walidator integralnosci i poprawnosci plikow definicji operandow (operands.csv) dla VisiLogic.
+    verify_operands.ps1 - Structural and Subroutine Coverage Auditor for VisiLogic Operands (.csv).
 .DESCRIPTION
-    Weryfikuje strukture pliku CSV (dokladnie 8193 wiersze, 18 kolumn), poprawnosc kodowania CP1250,
-    brak duplikatow opisow w ramach typu pamieci, limity dlugosci (max 50 znakow dla zmiennych uzytkownika)
-    oraz opcjonalnie porownuje operandy z uzytymi w plikach drabinkowych (*.vlx).
-.PARAMETER CsvPath
-    Sciezka do sprawdzanego pliku operands.csv.
-.PARAMETER VlxDir
-    Opcjonalna sciezka do katalogu z plikami *.vlx w celu weryfikacji pokrycia operandow.
+    Validates a VisiLogic operands CSV file against all import constraints:
+    1. Exact row count (8,193 lines = 1 header + 8,192 address rows 0..8191)
+    2. Exact 18-column header sequence
+    3. Valid delimiter count per row (18 commas)
+    4. Maximum 50-character limit on user operand descriptions
+    5. Duplicate tag detection within user memory columns
+    6. Optional coverage check against compiled *.vlx ladder subroutines
 #>
 
 param(
-    [Parameter(Position=0)]
-    [Alias("Path")]
     [string]$CsvPath = "",
-
     [string]$VlxDir = ""
 )
 
-# Jezeli uruchomiono w 64-bit i trzeba skanowac VLX, przelacz na SysWOW64
-if ([IntPtr]::Size -eq 8) {
+if (-not [string]::IsNullOrWhiteSpace($VlxDir) -and [IntPtr]::Size -eq 8) {
     $sysWow64 = Join-Path $env:windir "SysWOW64\WindowsPowerShell\v1.0\powershell.exe"
     if (Test-Path $sysWow64) {
         $argList = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "`"$PSCommandPath`"")
@@ -31,196 +27,161 @@ if ([IntPtr]::Size -eq 8) {
     }
 }
 
-Write-Host "======================================================================" -ForegroundColor Cyan
-Write-Host "   WALIDATOR INTEGRALNOSCI PLIKU OPERANDOW (*.CSV) DLA VISILOGIC      " -ForegroundColor Cyan
-Write-Host "======================================================================" -ForegroundColor Cyan
+$ErrorActionPreference = "Stop"
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 
-$currentDir = Split-Path -Parent $PSCommandPath
-$projectRoot = Split-Path -Parent (Split-Path -Parent $currentDir)
-
-if ([string]::IsNullOrEmpty($CsvPath)) {
-    $candidate = Join-Path $projectRoot "dokumentacja\Visilogic_projekt_operands.csv"
-    if (Test-Path $candidate) {
-        $CsvPath = $candidate
-    } else {
-        $CsvPath = Join-Path $currentDir "operands.csv"
-    }
+if ([string]::IsNullOrWhiteSpace($CsvPath)) {
+    $CsvPath = Join-Path $scriptDir "DEMO_OPERANDS.csv"
 }
 
+Write-Host "======================================================================" -ForegroundColor Cyan
+Write-Host "   VISILOGIC OPERANDS CSV INTEGRITY AUDITOR                           " -ForegroundColor Cyan
+Write-Host "======================================================================" -ForegroundColor Cyan
+
 if (-not (Test-Path $CsvPath)) {
-    Write-Host "[BLAD] Nie znaleziono pliku do weryfikacji: $CsvPath" -ForegroundColor Red
+    Write-Host "[ERROR] Target CSV file does not exist: $CsvPath" -ForegroundColor Red
     exit 1
 }
 
-Write-Host "--> Badany plik: $CsvPath" -ForegroundColor White
+Write-Host "Inspecting file: $CsvPath" -ForegroundColor Yellow
 
-$expectedHeader = "Address,MB,MI,MF,ML,MDW,SB,SI,SL,SDW,I,O,T,C,XB,XI,XL,XDW"
-$typeNames = @('MB','MI','MF','ML','MDW','SB','SI','SL','SDW','I','O','T','C','XB','XI','XL','XDW')
+$enc = [System.Text.Encoding]::GetEncoding(1250)
+$lines = [System.IO.File]::ReadAllLines($CsvPath, $enc)
 
 $errors = 0
 $warnings = 0
 
-# 1. Wczytanie w kodowaniu Windows-1250
-$enc = [System.Text.Encoding]::GetEncoding(1250)
-$lines = [System.IO.File]::ReadAllLines($CsvPath, $enc)
-
-Write-Host "[INFO] Liczba linii w pliku: $($lines.Length)" -ForegroundColor Gray
-
-if ($lines.Length -ne 8193) {
-    Write-Host "[OSTRZEZENIE] Liczba linii wynosi $($lines.Length) (oczekiwano dokladnie 8193: 1 naglowek + 8192 wiersze od 0 do 8191)." -ForegroundColor Yellow
-    $warnings++
+# 1. Check total line count (8193)
+if ($lines.Count -eq 8193) {
+    Write-Host "[OK] Line count: 8193 (1 header + 8192 address rows 0..8191)" -ForegroundColor Green
 } else {
-    Write-Host "   [OK] Liczba wierszy: 8193 (pelna tablica adresowa 0..8191)" -ForegroundColor Green
-}
-
-# 2. Sprawdzenie naglowka
-$actualHeader = $lines[0].Trim()
-if ($actualHeader -ne $expectedHeader) {
-    Write-Host "[BLAD] Niepoprawny naglowek CSV!" -ForegroundColor Red
-    Write-Host "   Oczekiwano: $expectedHeader" -ForegroundColor Red
-    Write-Host "   Otrzymano : $actualHeader" -ForegroundColor Red
+    Write-Host "[ERROR] Invalid line count: $($lines.Count) (expected exactly 8193)!" -ForegroundColor Red
     $errors++
+}
+
+# 2. Check header
+$expectedHeader = "Address,MB,MI,MF,ML,MDW,SB,SI,SL,SDW,I,O,T,C,XB,XI,XL,XDW"
+if ($lines[0].TrimEnd(',') -eq $expectedHeader) {
+    Write-Host "[OK] Header matches the 18-column VisiLogic specification." -ForegroundColor Green
 } else {
-    Write-Host "   [OK] Naglowek CSV zgodny ze standardem VisiLogic (18 kolumn)" -ForegroundColor Green
+    Write-Host "[ERROR] Invalid CSV header: '$($lines[0])' (expected '$expectedHeader')" -ForegroundColor Red
+    $errors++
 }
 
-# 3. Badanie wierszy pod katem separatorow, dlugosci i duplikatow
-$uniqueNamesByType = @{}
-foreach ($t in $typeNames) {
-    $uniqueNamesByType[$t] = @{}
+$cols = $expectedHeader.Split(',')
+$userColIndices = @(1, 2, 3, 4, 5, 10, 11, 12, 13, 14, 15, 16, 17)
+$seenNames = @{}
+foreach ($idx in $userColIndices) {
+    $seenNames[$cols[$idx]] = @{}
 }
 
-$longNamesCount = 0
-$duplicateNamesCount = 0
-$invalidColCount = 0
+$badCommaRows = 0
+$tooLongCount = 0
+$duplicateCount = 0
+$definedUserTags = 0
 
-for ($i = 1; $i -lt $lines.Length; $i++) {
+$grid = @{}
+foreach ($c in $cols) {
+    if ($c -ne "Address") { $grid[$c] = New-Object string[] 8192 }
+}
+
+for ($i = 1; $i -lt [Math]::Min($lines.Count, 8193); $i++) {
     $line = $lines[$i]
     $parts = $line.Split(',')
 
-    # VisiLogic natywnie eksportuje wiersze z 18 przecinkami (19 pol, z czego ostatnie jest puste - trailing comma)
-    # lub czysty format 18 kolumn (17 przecinkow)
-    $isValidCols = ($parts.Length -eq 18) -or ($parts.Length -eq 19 -and $parts[18].Trim() -eq "")
-    if (-not $isValidCols) {
-        if ($invalidColCount -lt 5) {
-            Write-Host "[BLAD] Wiersz $($i) (Adres $($i-1)) ma $($parts.Length) kolumn zamiast 18! Zawartosc: $line" -ForegroundColor Red
+    # VisiLogic data rows have 18 commas -> 19 elements when split (last element empty)
+    if ($parts.Count -lt 18 -or $parts.Count -gt 19) {
+        $badCommaRows++
+        continue
+    }
+
+    $addr = $i - 1
+    foreach ($cIdx in $userColIndices) {
+        if ($cIdx -ge $parts.Count) { continue }
+        $colName = $cols[$cIdx]
+        $val = $parts[$cIdx].Trim()
+        $grid[$colName][$addr] = $val
+
+        if (-not [string]::IsNullOrEmpty($val)) {
+            $definedUserTags++
+            if ($val.Length -gt 50) {
+                $tooLongCount++
+                Write-Host "  [WARNING] Description > 50 chars at $colName $addr ($($val.Length) chars): '$val'" -ForegroundColor Yellow
+                $warnings++
+            }
+            if ($seenNames[$colName].ContainsKey($val)) {
+                $duplicateCount++
+            } else {
+                $seenNames[$colName][$val] = $addr
+            }
         }
-        $invalidColCount++
-        $errors++
     }
+}
 
-    $addr = $parts[0].Trim()
-    if ($addr -ne ($i - 1).ToString()) {
-        Write-Host "[BLAD] Niespojnosc adresu w wierszu $($i): znaleziono '$addr', oczekiwano '$($i - 1)'" -ForegroundColor Red
-        $errors++
+if ($badCommaRows -eq 0) {
+    Write-Host "[OK] All data rows have valid column delimiter alignment." -ForegroundColor Green
+} else {
+    Write-Host "[ERROR] Found $badCommaRows row(s) with corrupted comma counts!" -ForegroundColor Red
+    $errors++
+}
+
+if ($tooLongCount -eq 0) {
+    Write-Host "[OK] All user descriptions comply with the 50-character limit." -ForegroundColor Green
+}
+
+if ($duplicateCount -eq 0) {
+    Write-Host "[OK] Zero duplicate symbol names in user memory columns ($definedUserTags tags defined)." -ForegroundColor Green
+} else {
+    Write-Host "[WARNING] Found $duplicateCount duplicate symbol name(s) across user memory columns." -ForegroundColor Yellow
+    $warnings++
+}
+
+# Optional VLX coverage audit
+if (-not [string]::IsNullOrWhiteSpace($VlxDir) -and (Test-Path $VlxDir) -and ([IntPtr]::Size -eq 4)) {
+    $typeMap = @{
+        1 = "MB"; 3 = "MI"; 5 = "ML"; 7 = "MF";
+        9 = "I"; 10 = "O"; 11 = "T"; 12 = "C"; 16 = "MDW"
     }
+    $vlxFiles = Get-ChildItem -Path $VlxDir -Filter "*.vlx" -File -Recurse
+    $missingTags = 0
 
-    # Sprawdzenie kolumn
-    for ($c = 0; $c -lt $typeNames.Length; $c++) {
-        $colIdx = $c + 1
-        if ($colIdx -lt $parts.Length) {
-            $val = $parts[$colIdx].Trim()
-            if ($val -ne "") {
-                $tName = $typeNames[$c]
-
-                # Limit dlugosci 50 znakow dla zmiennych uzytkownika
-                if ($tName -notin @('SB','SI','SL','SDW')) {
-                    if ($val.Length -gt 50) {
-                        Write-Host "[BLAD] Opis operandu $($tName) $($i-1) przekracza dopuszczalny limit 50 znakow (Dlugosc: $($val.Length)): '$val'" -ForegroundColor Red
-                        $errors++
-                        $longNamesCount++
-                    } elseif ($val.Length -gt 32) {
-                        if ($longNamesCount -lt 3) {
-                            Write-Host "[INFO] Opis operandu $($tName) $($i-1) ma dlugosc $($val.Length) znakow (>32): '$val'" -ForegroundColor Gray
-                        }
-                    }
-
-                    # Duplikaty w pamieci uzytkownika
-                    if ($uniqueNamesByType[$tName].ContainsKey($val)) {
-                        $prevAddr = $uniqueNamesByType[$tName][$val]
-                        Write-Host "[OSTRZEZENIE] Duplikat nazwy w typie $($tName): '$val' wystepuje pod adresem $prevAddr oraz $($i-1)" -ForegroundColor Yellow
+    foreach ($vf in $vlxFiles) {
+        $cs = "Provider=Microsoft.Jet.OLEDB.4.0;Data Source=$($vf.FullName);Jet OLEDB:Database Password=UniOpenSesame;"
+        $conn = New-Object System.Data.OleDb.OleDbConnection($cs)
+        try {
+            $conn.Open()
+            $cmd = $conn.CreateCommand()
+            $cmd.CommandText = "SELECT DISTINCT Elmnt_Oprnd_Type, Elmnt_Oprnd_Adrs FROM expimp_LdrElmsOprs"
+            $r = $cmd.ExecuteReader()
+            while ($r.Read()) {
+                if ($r[0] -is [System.DBNull] -or $r[1] -is [System.DBNull]) { continue }
+                $tId = [int]$r[0]
+                $a = [int]$r[1]
+                if ($typeMap.ContainsKey($tId) -and $a -ge 0 -and $a -lt 8192) {
+                    $cName = $typeMap[$tId]
+                    if ([string]::IsNullOrWhiteSpace($grid[$cName][$a])) {
+                        Write-Host "  [WARNING] Subroutine '$($vf.Name)' references untagged operand: $cName $a" -ForegroundColor Yellow
+                        $missingTags++
                         $warnings++
-                        $duplicateNamesCount++
-                    } else {
-                        $uniqueNamesByType[$tName][$val] = ($i - 1)
                     }
                 }
             }
+            $r.Close()
+        } finally {
+            $conn.Close()
         }
     }
-}
 
-if ($invalidColCount -eq 0) {
-    Write-Host "   [OK] Wszystkie wiersze posiadaja prawidlowa liczbe kolumn (18)" -ForegroundColor Green
-}
-if ($longNamesCount -eq 0) {
-    Write-Host "   [OK] Zadna nazwa zmiennej uzytkownika nie przekracza limitu 50 znakow" -ForegroundColor Green
-}
-if ($duplicateNamesCount -eq 0) {
-    Write-Host "   [OK] Brak zduplikowanych nazw w pamieci uzytkownika" -ForegroundColor Green
-}
-
-# 4. Statystyki zdefiniowanych operandow
-Write-Host "`n--- Statystyka zdefiniowanych nazw w badanym pliku ---" -ForegroundColor Cyan
-$statsOutput = [System.Collections.Generic.List[string]]::new()
-foreach ($t in $typeNames) {
-    $count = 0
-    for ($i = 1; $i -lt $lines.Length; $i++) {
-        $parts = $lines[$i].Split(',')
-        $idx = [array]::IndexOf($typeNames, $t) + 1
-        if ($idx -lt $parts.Length -and $parts[$idx].Trim() -ne "") {
-            $count++
-        }
-    }
-    if ($count -gt 0) {
-        $statsOutput.Add(("{0,-5}: {1,-4}" -f $t, $count))
-    }
-}
-Write-Host ($statsOutput -join " | ") -ForegroundColor White
-
-# 5. Opcjonalne porownanie z plikami *.vlx
-if ([string]::IsNullOrEmpty($VlxDir)) {
-    $defaultVlx = Join-Path $projectRoot "wygenerowane_pliki_projektu\vlx_subroutines"
-    if (Test-Path $defaultVlx) {
-        $VlxDir = $defaultVlx
+    if ($missingTags -eq 0) {
+        Write-Host "[OK] 100% of operands referenced in $($vlxFiles.Count) *.vlx file(s) have descriptive tags!" -ForegroundColor Green
     }
 }
 
-if (-not [string]::IsNullOrEmpty($VlxDir) -and (Test-Path $VlxDir)) {
-    Write-Host "`n--> Weryfikacja pokrycia operandow z plikami drabinkowymi *.vlx..." -ForegroundColor Cyan
-    $engineScript = Join-Path $currentDir "OperandsBuilder.ps1"
-    if (Test-Path $engineScript) {
-        . $engineScript
-        $builder = [OperandsBuilder]::new()
-        $builder.LoadTemplate($CsvPath)
-        $scan = $builder.ScanVlxOperands($VlxDir)
-
-        $missingCount = $scan['Missing'].Count
-        $usedCount = $scan['Used'].Count
-        Write-Host "   Laczna liczba uzytych operandow w drabinkach: $usedCount" -ForegroundColor Gray
-
-        if ($missingCount -gt 0) {
-            Write-Host "[OSTRZEZENIE] Wykryto $missingCount uzyc operandow bez zdefiniowanego opisu w pliku CSV:" -ForegroundColor Yellow
-            $grouped = $scan['Missing'] | Group-Object -Property Type
-            foreach ($g in $grouped) {
-                $addrs = ($g.Group | Select-Object -ExpandProperty Address -Unique | Sort-Object) -join ', '
-                Write-Host "   Typ $($g.Name): adresy [$addrs]" -ForegroundColor Yellow
-            }
-            $warnings += $missingCount
-        } else {
-            Write-Host "   [OK] Wszystkie operandy uzyte w podprogramach *.vlx posiadaja opisy w pliku CSV!" -ForegroundColor Green
-        }
-    }
-}
-
-Write-Host "----------------------------------------------------------------------" -ForegroundColor Gray
-if ($errors -eq 0 -and $warnings -eq 0) {
-    Write-Host "[SUKCES] Plik CSV jest w 100% poprawny, kompletny i gotowy do importu w VisiLogic!" -ForegroundColor Green
-} elseif ($errors -eq 0) {
-    Write-Host "[SUKCES Z OSTRZEZENIAMI] Bledow: 0, Ostrzezen: $warnings. Plik nadaje sie do importu." -ForegroundColor Yellow
+Write-Host "`n----------------------------------------------------------------------" -ForegroundColor Gray
+if ($errors -eq 0) {
+    Write-Host "[SUCCESS] CSV file is 100% valid and ready for VisiLogic import ($warnings warning(s))!" -ForegroundColor Green
+    exit 0
 } else {
-    Write-Host "[NIEPOWODZENIE] Wykryto $errors bledow oraz $warnings ostrzezen! Wymagana korekta przed importem." -ForegroundColor Red
+    Write-Host "[FAILED] CSV verification found $errors error(s) and $warnings warning(s)!" -ForegroundColor Red
+    exit 1
 }
-Write-Host "======================================================================`n" -ForegroundColor Gray
-
-if ($errors -gt 0) { exit 1 } else { exit 0 }

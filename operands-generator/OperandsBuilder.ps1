@@ -1,271 +1,264 @@
 <#
 .SYNOPSIS
-    Silnik obiektowy generatora plikow definicji operandow (operands.csv) dla Unitronics VisiLogic.
+    OperandsBuilder.ps1 - Object-Oriented Operands Database Generator Engine (.csv) for Unitronics VisiLogic.
 .DESCRIPTION
-    Zarzadza tytulami/opisami operandow we wszystkich 17 typach pamieci VisiLogic:
-    MB, MI, MF, ML, MDW, SB, SI, SL, SDW, I, O, T, C, XB, XI, XL, XDW.
-    Generuje pliki CSV w pelni zgodne ze standardem eksportu/importu VisiLogic (8192 wiersze, 18 kolumn, CP1250/ANSI).
+    Manages the full 8,192-row x 18-column VisiLogic operand address space (MB, MI, MF, ML, MDW,
+    SB, SI, SL, SDW, I, O, T, C, XB, XI, XL, XDW), preserves factory Unitronics system tag descriptions,
+    sanitizes commas and length limits, scans compiled ladder subroutines (*.vlx) for unlabelled variables,
+    and writes Windows-1250 (ANSI) CSV files ready for direct import into Unitronics VisiLogic.
 #>
 
 class OperandsBuilder {
-    [string]$TemplatePath
-    [string[]]$Header
-    [hashtable]$Data
-    [string[]]$TypeNames = @('MB','MI','MF','ML','MDW','SB','SI','SL','SDW','I','O','T','C','XB','XI','XL','XDW')
+    [string[]]$Columns = @(
+        "Address", "MB", "MI", "MF", "ML", "MDW",
+        "SB", "SI", "SL", "SDW",
+        "I", "O", "T", "C",
+        "XB", "XI", "XL", "XDW"
+    )
+    [int]$MaxAddress = 8191
+    [int]$MaxDescLength = 50
+    [hashtable]$Grid
 
     OperandsBuilder() {
-        $this.Header = @('Address','MB','MI','MF','ML','MDW','SB','SI','SL','SDW','I','O','T','C','XB','XI','XL','XDW')
-        $this.Data = @{}
-        foreach ($t in $this.TypeNames) {
-            $arr = New-Object string[] 8192
-            for ($i = 0; $i -lt 8192; $i++) {
-                $arr[$i] = ""
-            }
-            $this.Data[$t] = $arr
+        $this.InitGrid()
+    }
+
+    OperandsBuilder([string]$templatePath) {
+        $this.InitGrid()
+        if (-not [string]::IsNullOrWhiteSpace($templatePath)) {
+            $this.LoadCsv($templatePath, $true)
         }
     }
 
-    [void]LoadTemplate([string]$path) {
-        $this.TemplatePath = $path
-        if (-not (Test-Path $path)) {
-            throw "Nie znaleziono pliku szablonu: $path"
-        }
-
-        $enc = [System.Text.Encoding]::GetEncoding(1250)
-        $lines = [System.IO.File]::ReadAllLines($path, $enc)
-        if ($lines.Length -lt 2) {
-            throw "Plik szablonu jest pusty lub uszkodzony."
-        }
-
-        $limit = [Math]::Min($lines.Length - 1, 8192)
-        for ($i = 1; $i -le $limit; $i++) {
-            $rowIdx = $i - 1
-            $parts = $lines[$i].Split(',')
-            for ($c = 0; $c -lt $this.TypeNames.Length; $c++) {
-                $colIdx = $c + 1
-                if ($colIdx -lt $parts.Length) {
-                    $val = $parts[$colIdx].Trim()
-                    if ($val -ne "") {
-                        $tName = $this.TypeNames[$c]
-                        $this.Data[$tName][$rowIdx] = $val
-                    }
-                }
+    [void] InitGrid() {
+        $this.Grid = @{}
+        foreach ($col in $this.Columns) {
+            if ($col -ne "Address") {
+                $this.Grid[$col] = New-Object string[] ($this.MaxAddress + 1)
             }
         }
     }
 
-    [string]SanitizeDescription([string]$text) {
-        if ([string]::IsNullOrEmpty($text)) { return "" }
-        $clean = $text.Replace(',', '|').Replace("`r", "").Replace("`n", " ")
-        $clean = [regex]::Replace($clean, '\s+', ' ').Trim()
-        if ($clean.Length -gt 50) {
-            $clean = $clean.Substring(0, 50).Trim()
+    [void] LoadTemplate([string]$templatePath) {
+        $this.LoadCsv($templatePath, $true)
+    }
+
+    [string] SanitizeDescription([string]$raw, [bool]$isSystemColumn) {
+        if ([string]::IsNullOrWhiteSpace($raw)) {
+            return ""
+        }
+        $clean = $raw -replace "[\r\n]+", " "
+        $clean = $clean.Trim()
+        # Replace commas with pipe '|' because VisiLogic's CSV parser splits unconditionally on ','
+        if ($clean.Contains(",")) {
+            $clean = $clean.Replace(",", "|")
+        }
+        if (-not $isSystemColumn -and $clean.Length -gt $this.MaxDescLength) {
+            $clean = $clean.Substring(0, $this.MaxDescLength).Trim()
         }
         return $clean
     }
 
-    [void]SetOperand([string]$type, [int]$address, [string]$description) {
-        $typeUpper = $type.ToUpper()
-        if (-not $this.Data.ContainsKey($typeUpper)) {
-            throw "Nieznany typ operandu: '$type'. Dozwolone: $($this.TypeNames -join ', ')"
+    [void] SetOperand([string]$type, [int]$address, [string]$description) {
+        $col = $type.Trim().ToUpperInvariant()
+        if (-not $this.Grid.ContainsKey($col)) {
+            throw "Unsupported operand type: $col"
         }
-        if ($address -lt 0 -or $address -ge 8192) {
-            throw "Adres operandu $address poza zakresem (0..8191)."
+        if ($address -lt 0 -or $address -gt $this.MaxAddress) {
+            throw "Operand address out of range (0..$($this.MaxAddress)): $col $address"
         }
-        $sanitized = $this.SanitizeDescription($description)
-        $this.Data[$typeUpper][$address] = $sanitized
+        $isSys = $col -in @("SB", "SI", "SL", "SDW")
+        $this.Grid[$col][$address] = $this.SanitizeDescription($description, $isSys)
     }
 
-    [string]GetOperand([string]$type, [int]$address) {
-        $typeUpper = $type.ToUpper()
-        if (-not $this.Data.ContainsKey($typeUpper) -or $address -lt 0 -or $address -ge 8192) {
+    [string] GetOperand([string]$type, [int]$address) {
+        $col = $type.Trim().ToUpperInvariant()
+        if (-not $this.Grid.ContainsKey($col)) {
             return ""
         }
-        return $this.Data[$typeUpper][$address]
-    }
-
-    [void]AddBulk([string]$type, [hashtable]$map) {
-        foreach ($addr in $map.Keys) {
-            $this.SetOperand($type, [int]$addr, [string]$map[$addr])
+        if ($address -lt 0 -or $address -gt $this.MaxAddress) {
+            return ""
         }
+        return [string]$this.Grid[$col][$address]
     }
 
-    [void]MergeExistingCsv([string]$csvPath) {
+    [void] LoadCsv([string]$csvPath, [bool]$overwriteSystem) {
         if (-not (Test-Path $csvPath)) {
-            throw "Nie znaleziono pliku CSV do scalenia: $csvPath"
+            throw "CSV file does not exist: $csvPath"
         }
         $enc = [System.Text.Encoding]::GetEncoding(1250)
         $lines = [System.IO.File]::ReadAllLines($csvPath, $enc)
-        $limit = [Math]::Min($lines.Length - 1, 8192)
-        for ($i = 1; $i -le $limit; $i++) {
-            $rowIdx = $i - 1
-            $parts = $lines[$i].Split(',')
-            for ($c = 0; $c -lt $this.TypeNames.Length; $c++) {
-                $colIdx = $c + 1
-                if ($colIdx -lt $parts.Length) {
-                    $val = $parts[$colIdx].Trim()
-                    if ($val -ne "") {
-                        $tName = $this.TypeNames[$c]
-                        $this.Data[$tName][$rowIdx] = $this.SanitizeDescription($val)
-                    }
+        if ($lines.Count -lt 2) {
+            return
+        }
+
+        for ($i = 1; $i -lt $lines.Count; $i++) {
+            $line = $lines[$i]
+            if ([string]::IsNullOrWhiteSpace($line)) { continue }
+            $parts = $line.Split(',')
+            $addr = 0
+            if (-not [int]::TryParse($parts[0].Trim(), [ref]$addr)) { continue }
+            if ($addr -lt 0 -or $addr -gt $this.MaxAddress) { continue }
+
+            for ($cIdx = 1; $cIdx -lt $this.Columns.Count; $cIdx++) {
+                if ($cIdx -ge $parts.Count) { break }
+                $colName = $this.Columns[$cIdx]
+                $val = $parts[$cIdx]
+                if ([string]::IsNullOrWhiteSpace($val)) { continue }
+
+                $isSys = $colName -in @("SB", "SI", "SL", "SDW")
+                if ($isSys -and -not $overwriteSystem -and -not [string]::IsNullOrWhiteSpace($this.Grid[$colName][$addr])) {
+                    continue
                 }
+                $this.Grid[$colName][$addr] = $this.SanitizeDescription($val, $isSys)
             }
         }
     }
 
-    [int]ImportIoList([string]$ioCsvPath) {
+    [int] ImportIoMap([string]$ioCsvPath) {
         if (-not (Test-Path $ioCsvPath)) {
-            return 0
+            throw "I/O map CSV file does not exist: $ioCsvPath"
         }
         $enc = [System.Text.Encoding]::GetEncoding(1250)
         $lines = [System.IO.File]::ReadAllLines($ioCsvPath, $enc)
-        $count = 0
+        $imported = 0
 
-        for ($i = 1; $i -lt $lines.Length; $i++) {
-            $line = $lines[$i].Trim()
-            if ($line -eq "") { continue }
-            $cols = $line.Split(';')
-            if ($cols.Length -lt 5) { continue }
+        foreach ($line in $lines) {
+            if ([string]::IsNullOrWhiteSpace($line)) { continue }
+            $delim = if ($line.Contains(";")) { ';' } else { ',' }
+            $parts = $line.Split($delim)
+            if ($parts.Count -lt 3) { continue }
 
-            $plcAddr = $cols[1].Trim().ToUpper()
-            $sigName = $cols[4].Trim()
+            $rawType = $parts[0].Trim().ToUpperInvariant()
+            $rawAddr = $parts[1].Trim()
+            $rawDesc = $parts[2].Trim()
 
-            if ($sigName -eq "" -or $sigName -eq "-" -or $sigName -match "PUSTE" -or $sigName -match "WOLNE") {
+            if ($rawDesc -match "(?i)^(EMPTY|FREE|SPARE|RESERVED|UNUSED|-+)$") {
                 continue
             }
 
-            if ($plcAddr -match '^([A-Z]+)(\d+)$') {
-                $prefix = $Matches[1]
-                $num = [int]$Matches[2]
-                $targetType = ""
+            $addr = 0
+            if ($rawAddr -match "^(MB|MI|MF|ML|MDW|I|O|T|C)\s*(\d+)$") {
+                $rawType = $Matches[1].ToUpperInvariant()
+                $addr = [int]$Matches[2]
+            } elseif (-not [int]::TryParse($rawAddr, [ref]$addr)) {
+                continue
+            }
 
-                switch ($prefix) {
-                    'I'   { $targetType = 'I' }
-                    'O'   { $targetType = 'O' }
-                    'AI'  { $targetType = 'MI' }
-                    'MB'  { $targetType = 'MB' }
-                    'MI'  { $targetType = 'MI' }
-                    'ML'  { $targetType = 'ML' }
-                    'DW'  { $targetType = 'MDW' }
-                    'MF'  { $targetType = 'MF' }
-                    'T'   { $targetType = 'T' }
-                }
-
-                if ($targetType -ne "") {
-                    $safeName = $sigName.Replace(' ', '_').Replace('-', '_').Replace('.', '_')
-                    $this.SetOperand($targetType, $num, $safeName)
-                    $count++
-                }
+            if ($this.Grid.ContainsKey($rawType) -and $addr -ge 0 -and $addr -le $this.MaxAddress -and -not [string]::IsNullOrWhiteSpace($rawDesc)) {
+                $this.SetOperand($rawType, $addr, $rawDesc)
+                $imported++
             }
         }
-        return $count
+        return $imported
     }
 
-    [hashtable]ScanVlxOperands([string]$vlxDirectory) {
-        $results = @{
-            'Used' = @{};
-            'Missing' = [System.Collections.Generic.List[object]]::new()
+    [int] ScanVlxDirectory([string]$vlxDir, [bool]$autoNameMissing) {
+        if (-not (Test-Path $vlxDir)) {
+            return 0
         }
-
-        if (-not (Test-Path $vlxDirectory)) { return $results }
-        $vlxFiles = Get-ChildItem -Path $vlxDirectory -Filter "*.vlx" -Recurse
+        if ([IntPtr]::Size -ne 4) {
+            throw "Scanning *.vlx databases requires 32-bit PowerShell (x86) for Microsoft.Jet.OLEDB.4.0."
+        }
 
         $typeMap = @{
-            0  = 'MB'
-            1  = 'MI'
-            2  = 'ML'
-            3  = 'MDW'
-            4  = 'MF'
-            5  = 'T'
-            6  = 'C'
-            8  = 'XB'
-            9  = 'XI'
-            10 = 'I'
-            11 = 'O'
-            14 = 'XL'
-            15 = 'XDW'
-            18 = 'SB'
-            19 = 'SI'
-            20 = 'SL'
-            21 = 'SDW'
+            1  = "MB"
+            2  = "SB"
+            3  = "MI"
+            4  = "SI"
+            5  = "ML"
+            6  = "SL"
+            7  = "MF"
+            9  = "I"
+            10 = "O"
+            11 = "T"
+            12 = "C"
+            16 = "MDW"
         }
 
-        foreach ($f in $vlxFiles) {
+        $missingFilled = 0
+        $vlxFiles = Get-ChildItem -Path $vlxDir -Filter "*.vlx" -File -Recurse
+
+        foreach ($file in $vlxFiles) {
+            $cs = "Provider=Microsoft.Jet.OLEDB.4.0;Data Source=$($file.FullName);Jet OLEDB:Database Password=UniOpenSesame;"
+            $conn = New-Object System.Data.OleDb.OleDbConnection($cs)
             try {
-                $connStr = 'Provider=Microsoft.Jet.OLEDB.4.0;Data Source=' + $f.FullName + ';Jet OLEDB:Database Password=UniOpenSesame;'
-                $conn = New-Object System.Data.OleDb.OleDbConnection($connStr)
                 $conn.Open()
                 $cmd = $conn.CreateCommand()
-                $cmd.CommandText = 'SELECT DISTINCT Elmnt_Oprnd_Type, Elmnt_Oprnd_Adrs FROM expimp_LdrElmsOprs WHERE Elmnt_Oprnd_Type <> 37'
+
+                # First import any explicit descriptions stored inside expimp_LdrOperands
+                $cmd.CommandText = "SELECT OprndType, OprndAddress, OprndDescription FROM expimp_LdrOperands"
                 $reader = $cmd.ExecuteReader()
                 while ($reader.Read()) {
-                    $rawType = $reader.GetInt32(0)
-                    $addr = $reader.GetInt32(1)
-                    if ($typeMap.ContainsKey($rawType)) {
-                        $colName = $typeMap[$rawType]
-                        $key = $colName + ':' + $addr.ToString()
-                        $results['Used'][$key] = $true
-
-                        $currentDesc = $this.GetOperand($colName, $addr)
-                        if ([string]::IsNullOrEmpty($currentDesc)) {
-                            $missingItem = [PSCustomObject]@{
-                                File = $f.Name
-                                Type = $colName
-                                Address = $addr
-                                RawType = $rawType
+                    $tId = [int]$reader["OprndType"]
+                    $addr = [int]$reader["OprndAddress"]
+                    $desc = if ($reader["OprndDescription"] -is [System.DBNull]) { "" } else { [string]$reader["OprndDescription"] }
+                    if ($typeMap.ContainsKey($tId) -and $addr -ge 0 -and $addr -le $this.MaxAddress) {
+                        $col = $typeMap[$tId]
+                        if (-not ($col -in @("SB", "SI", "SL", "SDW")) -and -not [string]::IsNullOrWhiteSpace($desc)) {
+                            if ([string]::IsNullOrWhiteSpace($this.GetOperand($col, $addr))) {
+                                $this.SetOperand($col, $addr, $desc)
                             }
-                            $results['Missing'].Add($missingItem)
                         }
                     }
                 }
                 $reader.Close()
+
+                # Next scan expimp_LdrElmsOprs for any used operands lacking descriptions
+                $cmd.CommandText = "SELECT DISTINCT Elmnt_Oprnd_Type, Elmnt_Oprnd_Adrs FROM expimp_LdrElmsOprs"
+                $reader2 = $cmd.ExecuteReader()
+                while ($reader2.Read()) {
+                    if ($reader2[0] -is [System.DBNull] -or $reader2[1] -is [System.DBNull]) { continue }
+                    $tId = [int]$reader2[0]
+                    $addr = [int]$reader2[1]
+                    if ($typeMap.ContainsKey($tId) -and $addr -ge 0 -and $addr -le $this.MaxAddress) {
+                        $col = $typeMap[$tId]
+                        if ($col -in @("SB", "SI", "SL", "SDW")) { continue }
+                        $existing = $this.GetOperand($col, $addr)
+                        if ([string]::IsNullOrWhiteSpace($existing) -and $autoNameMissing) {
+                            $this.SetOperand($col, $addr, "Auto_${col}_${addr}")
+                            $missingFilled++
+                        }
+                    }
+                }
+                $reader2.Close()
+            } finally {
                 $conn.Close()
-            } catch {
-                # Ignoruj ewentualne bledy dostepu w 64-bit
             }
         }
-        return $results
+        return $missingFilled
     }
 
-    [hashtable]GetStats() {
-        $stats = @{}
-        foreach ($t in $this.TypeNames) {
-            $cnt = 0
-            for ($i = 0; $i -lt 8192; $i++) {
-                if ($this.Data[$t][$i] -ne "") { $cnt++ }
+    [void] SaveCsv([string]$outputPath) {
+        $sb = New-Object System.Text.StringBuilder(1048576)
+        # Header (18 columns, no trailing comma)
+        [void]$sb.AppendLine(($this.Columns -join ","))
+
+        # 8,192 rows (0..8191), each ending with a trailing comma per VisiLogic's native export format
+        for ($addr = 0; $addr -le $this.MaxAddress; $addr++) {
+            [void]$sb.Append($addr)
+            [void]$sb.Append(",")
+            for ($cIdx = 1; $cIdx -lt $this.Columns.Count; $cIdx++) {
+                $col = $this.Columns[$cIdx]
+                $val = $this.Grid[$col][$addr]
+                if (-not [string]::IsNullOrEmpty($val)) {
+                    [void]$sb.Append($val)
+                }
+                [void]$sb.Append(",")
             }
-            $stats[$t] = $cnt
+            [void]$sb.AppendLine()
         }
-        return $stats
+
+        $parentDir = Split-Path -Parent $outputPath
+        if ($parentDir -and -not (Test-Path $parentDir)) {
+            New-Item -ItemType Directory -Path $parentDir -Force | Out-Null
+        }
+
+        $enc = [System.Text.Encoding]::GetEncoding(1250)
+        [System.IO.File]::WriteAllText($outputPath, $sb.ToString(), $enc)
     }
 
-    [void]SaveToCsv([string]$outputPath) {
-        $this.SaveToCsv($outputPath, "Windows-1250")
-    }
-
-    [void]SaveToCsv([string]$outputPath, [string]$encodingName) {
-        $outDir = Split-Path -Parent $outputPath
-        if ($outDir -and -not (Test-Path $outDir)) {
-            New-Item -ItemType Directory -Path $outDir -Force | Out-Null
-        }
-
-        $enc = [System.Text.Encoding]::GetEncoding($encodingName)
-        $outLines = [System.Collections.Generic.List[string]]::new(8193)
-
-        $outLines.Add(($this.Header -join ','))
-
-        for ($addr = 0; $addr -lt 8192; $addr++) {
-            $rowValues = [System.Collections.Generic.List[string]]::new(18)
-            $rowValues.Add($addr.ToString())
-
-            foreach ($t in $this.TypeNames) {
-                $val = $this.Data[$t][$addr]
-                $rowValues.Add($val)
-            }
-
-            $outLines.Add(($rowValues -join ','))
-        }
-
-        [System.IO.File]::WriteAllLines($outputPath, $outLines, $enc)
+    [void] SaveToCsv([string]$outputPath) {
+        $this.SaveCsv($outputPath)
     }
 }

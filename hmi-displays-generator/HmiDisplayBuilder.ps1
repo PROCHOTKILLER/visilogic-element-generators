@@ -1,11 +1,11 @@
 <#
 .SYNOPSIS
-    HmiDisplayBuilder - Profesjonalny silnik generowania ekranów HMI (.vld) dla Unitronics VisiLogic (seria Vision V350).
+    HmiDisplayBuilder - Object-oriented HMI display generator engine (.vld) for Unitronics VisiLogic (Vision V350 series).
 .DESCRIPTION
-    Klasa HmiDisplayBuilder zarządza strukturą bazy Jet 4.0 (HMIBufferColorPages.udb),
-    tworzy strony HMI (Pages, Pages_all), notatki stron (DisplayNote), elementy graficzne
-    (HMI_Elements) oraz powiązania ze zmiennymi PLC (HMI_Operands), a następnie kompresuje
-    całość do pliku archiwum .vld gotowego do bezpośredniego importu w programie VisiLogic.
+    Manages the Microsoft Jet 4.0 database structure (HMIBufferColorPages.udb),
+    creates HMI display pages (Pages, Pages_all), display notes (DisplayNote), graphical controls
+    (HMI_Elements), operand bindings (HMI_Operands), and screen jump triggers (HMIJumps),
+    and packages the result into a .vld archive ready for direct import into Unitronics VisiLogic.
 #>
 
 Add-Type -AssemblyName System.IO.Compression
@@ -180,10 +180,9 @@ class HmiDisplay {
 
     [HmiElement] AddNavButton([int]$x, [int]$y, [int]$w, [int]$h, [string]$text, [int]$targetDisplayId, [int]$touchMbAddress, [int]$foreColor, [int]$backColor) {
         $btn = $this.AddButton($x, $y, $w, $h, $text, $touchMbAddress, $foreColor, $backColor)
-        # Note: Dla sterowników Vision V350 z dotykowym ekranem tabela HMIJumps w archiwum .vld
-        # musi zawierać dokładnie 0 rekordów. Nawigacja dotykowa realizowana jest poprzez TouchOprndAddr (MB).
-        # Silnik VB6 UnHmPge2.dll przy eksporcie/imporcie V350 posiada sztywną tablicę JumpArray(1 To 4).
-        # Dodanie skoków do HMIJumps wywołuje błąd VB6 'Run-time error 9: Subscript out of range'.
+        # Note: On Vision V350 touch-screen controllers, the VB6 UnHmPge2.dll engine allocates a fixed
+        # JumpArray(1 To 4) per display. Use AddJump() for up to 4 screen jumps per display, or handle
+        # additional navigation transitions in ladder logic via TouchOprndAddr (MB).
         return $btn
     }
 
@@ -540,7 +539,6 @@ class HmiDisplayBuilder {
         } else {
             $candidateDirs = @(
                 (Join-Path $PSScriptRoot "templates"),
-                "C:\Users\Panasonic\Documents\Agentsroom\Projekt PLC Unitronics V350 Komora 9\narzedzia\generator hmi displays\templates",
                 ".\templates"
             )
             foreach ($cd in $candidateDirs) {
@@ -589,7 +587,7 @@ class HmiDisplayBuilder {
 
     [void] SaveVld([string]$outputPath) {
         if (-not (Test-Path $this.TemplatePath)) {
-            throw "Nie znaleziono pliku szablonu bazy: $($this.TemplatePath)"
+            throw "Database template file not found: $($this.TemplatePath)"
         }
 
         # Create temporary working directory
@@ -834,7 +832,7 @@ INSERT INTO [HMIJumps] (
             Compress-Archive -Path $tempUdb -DestinationPath $tempZip -Force
             Move-Item $tempZip $outputPath -Force
 
-            Write-Host "Pomyslnie wygenerowano plik VLD: $outputPath" -ForegroundColor Green
+            Write-Host "Successfully generated VLD file: $outputPath" -ForegroundColor Green
         } finally {
             if (Test-Path $tempDir) {
                 Remove-Item $tempDir -Recurse -Force -ErrorAction SilentlyContinue

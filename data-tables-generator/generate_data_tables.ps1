@@ -1,117 +1,114 @@
 <#
 .SYNOPSIS
-    generate_data_tables.ps1 - Narzędzie wiersza poleceń (CLI) do generowania plików Data Tables XML dla Unitronics VisiLogic.
+    generate_data_tables.ps1 - Universal CLI Generator for Unitronics VisiLogic Data Tables (.xml).
 .DESCRIPTION
-    Tworzy poprawny semantycznie i strukturalnie plik Data_table.xml na podstawie parametrów CLI,
-    pliku konfiguracyjnego JSON lub nagłówków pliku CSV.
-.PARAMETER OutputPath
-    Docelowa ścieżka do pliku XML.
-.PARAMETER TableName
-    Nazwa tabeli (np. Recipe_Steps).
-.PARAMETER RowsCount
-    Liczba wierszy w tabeli (np. 20).
-.PARAMETER TableId
-    Identyfikator tabeli 1-based (domyślnie 1).
-.PARAMETER ConfigJson
-    Ścieżka do pliku JSON z definicją tabel i kolumn.
-.PARAMETER InputCsv
-    Ścieżka do pliku CSV, z którego zostaną pobrane nazwy kolumn.
-.PARAMETER Verify
-    Przełącznik uruchamiający automatyczną weryfikację integralności po wygenerowaniu pliku.
+    Builds VisiLogic Data Tables (.xml) from a JSON schema definition, CSV input file, or command-line parameters,
+    and automatically validates the resulting XML file with verify_data_tables.ps1.
+.EXAMPLE
+    .\generate_data_tables.ps1 -TableName "Recipe_Steps" -Rows 20 -CsvInput ".\steps.csv" -OutputPath ".\Recipe_Steps.xml"
 #>
 
-param (
-    [Parameter(Mandatory = $true, Position = 0)]
-    [string]$OutputPath,
-
-    [string]$TableName = "DataTable1",
-    [int]$RowsCount = 20,
-    [int]$TableId = 1,
-    [string]$ConfigJson,
-    [string]$InputCsv,
-    [switch]$Verify
+param(
+    [string]$OutputPath = "",
+    [string]$TableName = "Data_Table_1",
+    [int]$Rows = 16,
+    [string]$CsvInput = "",
+    [string]$JsonSpecPath = "",
+    [switch]$PartOfProject,
+    [switch]$ReadOnly
 )
 
+$ErrorActionPreference = "Stop"
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 . (Join-Path $scriptDir "DataTableBuilder.ps1")
 
-Write-Host "============================================================" -ForegroundColor Cyan
-Write-Host " GENERATOR DATA TABLES XML DLA UNITRONICS VISILOGIC (CLI)" -ForegroundColor Cyan
-Write-Host " Cel: $OutputPath" -ForegroundColor Cyan
-Write-Host "============================================================" -ForegroundColor Cyan
+if ([string]::IsNullOrWhiteSpace($OutputPath)) {
+    $OutputPath = Join-Path $scriptDir "GENERATED_DATA_TABLES.xml"
+}
+
+Write-Host "======================================================================" -ForegroundColor Cyan
+Write-Host "   UNITRONICS VISILOGIC DATA TABLES GENERATOR (.XML)                  " -ForegroundColor Cyan
+Write-Host "======================================================================" -ForegroundColor Cyan
 
 $builder = [DataTableBuilder]::new()
 
-if (-not [string]::IsNullOrEmpty($ConfigJson) -and (Test-Path $ConfigJson)) {
-    Write-Host "[INFO] Wczytywanie definicji z pliku JSON: $ConfigJson" -ForegroundColor DarkGray
-    $jsonContent = Get-Content -Raw $ConfigJson | ConvertFrom-Json
-    
-    # Obsluga tablicy tabel lub pojedynczej tabeli
-    $tableList = if ($jsonContent -is [array]) { $jsonContent } else { @($jsonContent) }
-    
-    foreach ($tDef in $tableList) {
-        $tId = if ($null -ne $tDef.TableId) { [int]$tDef.TableId } else { 1 }
-        $tName = if ($null -ne $tDef.Name) { $tDef.Name } else { "Table$tId" }
-        $tRows = if ($null -ne $tDef.RowsCount) { [int]$tDef.RowsCount } else { 20 }
+if (-not [string]::IsNullOrWhiteSpace($JsonSpecPath)) {
+    if (-not (Test-Path $JsonSpecPath)) {
+        throw "JSON specification file not found: $JsonSpecPath"
+    }
+    Write-Host "[INFO] Loading table schema from JSON specification: $JsonSpecPath" -ForegroundColor Yellow
+    $spec = Get-Content -Path $JsonSpecPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    foreach ($tSpec in $spec.tables) {
+        $tbl = $builder.AddTable([string]$tSpec.name, [int]$tSpec.rows)
+        if ($tSpec.partOfProject) { $tbl.PartOfProject = 1 }
+        if ($tSpec.readOnly) { $tbl.ReadOnly = 1 }
 
-        $tbl = $builder.NewTable($tId, $tName, $tRows)
+        foreach ($cSpec in $tSpec.columns) {
+            $dt = [VisiDataType]([string]$cSpec.type)
+            $sz = if ($cSpec.size) { [int]$cSpec.size } else { 1 }
+            $fmt = if ($cSpec.format) { [int]$cSpec.format } else { 0 }
+            [void]$tbl.AddColumn([string]$cSpec.name, $dt, $sz, $fmt)
+        }
 
-        if ($null -ne $tDef.Columns) {
-            foreach ($c in $tDef.Columns) {
-                $cType = if ($null -ne $c.FieldType) { [int]$c.FieldType } else { 2 }
-                $cSize = if ($null -ne $c.Size) { [int]$c.Size } else { 2 }
-                $cMin = if ($null -ne $c.MinValue) { [long]$c.MinValue } else { -32768 }
-                $cMax = if ($null -ne $c.MaxValue) { [long]$c.MaxValue } else { 32767 }
-                $cLen = if ($null -ne $c.StringLength) { [int]$c.StringLength } else { 10 }
-
-                $col = [DataColumnDefinition]::new($c.Name, $cType, $cSize, $cMin, $cMax, $cLen)
-                if ($null -ne $c.ReadOnly) { $col.ReadOnly = [bool]$c.ReadOnly }
-                if ($null -ne $c.PartOfProject) { $col.PartOfProject = [bool]$c.PartOfProject }
-                $tbl.AddColumn($col) | Out-Null
+        if ($tSpec.data) {
+            foreach ($rData in $tSpec.data) {
+                $tbl.AddRow([object[]]$rData)
             }
         }
     }
-} elseif (-not [string]::IsNullOrEmpty($InputCsv) -and (Test-Path $InputCsv)) {
-    Write-Host "[INFO] Tworzenie tabeli na podstawie naglowkow CSV: $InputCsv" -ForegroundColor DarkGray
-    $lines = Get-Content $InputCsv -Encoding Default
-    if ($lines.Count -gt 0) {
-        $headerLine = $lines[0]
-        # Wykrycie separatora (srednik lub przecinek)
-        $sep = if ($headerLine.Contains(";")) { ";" } else { "," }
-        $headers = $headerLine.Split($sep) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+}
+elseif (-not [string]::IsNullOrWhiteSpace($CsvInput)) {
+    if (-not (Test-Path $CsvInput)) {
+        throw "CSV input file not found: $CsvInput"
+    }
+    Write-Host "[INFO] Importing table structure and rows from CSV: $CsvInput" -ForegroundColor Yellow
+    $csvRows = Import-Csv -Path $CsvInput
+    $rowCount = [Math]::Max($Rows, $csvRows.Count)
+    $tbl = $builder.AddTable($TableName, $rowCount)
+    if ($PartOfProject) { $tbl.PartOfProject = 1 }
+    if ($ReadOnly) { $tbl.ReadOnly = 1 }
 
-        $tbl = $builder.NewTable($TableId, $TableName, $RowsCount)
+    $headers = $csvRows[0].PSObject.Properties.Name
+    foreach ($h in $headers) {
+        if ($h -match "(?i)(time|duration|sec|total|count32|long)") {
+            [void]$tbl.AddLongColumn($h)
+        } elseif ($h -match "(?i)(name|desc|label|title|text|code)") {
+            [void]$tbl.AddStringColumn($h, 16)
+        } elseif ($h -match "(?i)(flag|enable|active|bool)") {
+            [void]$tbl.AddBoolColumn($h)
+        } else {
+            [void]$tbl.AddIntColumn($h)
+        }
+    }
+
+    foreach ($row in $csvRows) {
+        $vals = @()
         foreach ($h in $headers) {
-            $hClean = $h.Trim()
-            # Automatyczna detekcja typu po nazwie
-            if ($hClean -match "(?i)czas|_s|long|total") {
-                $tbl.AddLong($hClean, 0, 86400) | Out-Null
-            } elseif ($hClean -match "(?i)nazwa|name|text|opis|str") {
-                $tbl.AddString($hClean, 16) | Out-Null
-            } elseif ($hClean -match "(?i)flaga|enable|on_off|bit|wentylator") {
-                $tbl.AddInteger($hClean, 0, 1) | Out-Null
-            } else {
-                $tbl.AddInteger($hClean, -32768, 32767) | Out-Null
-            }
+            $vals += $row.$h
         }
-        Write-Host "[OK] Dodano $($tbl.Columns.Count) kolumn z pliku CSV" -ForegroundColor Green
-    } else {
-        throw "Plik CSV jest pusty: $InputCsv"
+        $tbl.AddRow($vals)
     }
-} else {
-    Write-Host "[INFO] Generowanie domyslnej tabeli $TableName (ID=$TableId, Wierszy=$RowsCount)" -ForegroundColor DarkGray
-    $tbl = $builder.NewTable($TableId, $TableName, $RowsCount)
-    $tbl.AddInteger("Numer_Kroku", 1, $RowsCount) | Out-Null
-    $tbl.AddLong("Czas_Zadany_s", 0, 86400) | Out-Null
-    $tbl.AddInteger("Wartosc_Zadana", 0, 1000) | Out-Null
+}
+else {
+    Write-Host "[INFO] Generating default Data Table '$TableName' ($Rows rows)..." -ForegroundColor Yellow
+    $tbl = $builder.AddTable($TableName, $Rows)
+    if ($PartOfProject) { $tbl.PartOfProject = 1 }
+    if ($ReadOnly) { $tbl.ReadOnly = 1 }
+
+    [void]$tbl.AddIntColumn("Step_Number")
+    [void]$tbl.AddLongColumn("Target_Duration_s")
+    [void]$tbl.AddIntColumn("Target_Setpoint")
+    [void]$tbl.AddStringColumn("Step_Description", 16)
+
+    for ($i = 1; $i -le [Math]::Min(5, $Rows); $i++) {
+        $tbl.AddRow(@($i, ($i * 600), (200 + $i * 50), "Phase_$i"))
+    }
 }
 
 $builder.SaveXml($OutputPath)
-Write-Host "[SUKCES] Zapisano plik Data Table XML: $OutputPath" -ForegroundColor Green
+Write-Host "[SUCCESS] Generated Data Tables XML file: $OutputPath" -ForegroundColor Green
 
-if ($Verify) {
-    Write-Host "`nUruchamianie weryfikatora integralnosci..." -ForegroundColor Gray
-    $verifyScript = Join-Path $scriptDir "verify_data_tables.ps1"
-    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $verifyScript $OutputPath
-    exit $LASTEXITCODE
+$verifier = Join-Path $scriptDir "verify_data_tables.ps1"
+if (Test-Path $verifier) {
+    & $verifier -XmlPath $OutputPath
 }
