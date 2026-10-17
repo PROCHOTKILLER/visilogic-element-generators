@@ -1,215 +1,179 @@
-# Generator Podprogramów VisiLogic (VLX Generator AIO)
-### Kompletny pakiet narzędziowy All-In-One do generowania i walidacji podprogramów `*.vlx` dla sterowników PLC Unitronics (seria Vision / V350)
+# VisiLogic Ladder Subroutine Generator (VLX Generator AIO)
+### Complete All-In-One Toolkit for Generating, Wiring, and Validating `*.vlx` Subroutines for Unitronics Vision Series PLCs (V130, V350, V570, V1040, V1210)
 
 ---
 
-## 1. Wstęp i Architektura Rozwiązania (AIO)
+## 1. Introduction and Architecture (AIO)
 
-Pakiet **VLX Generator AIO** to zintegrowane, profesjonalne środowisko automatyzacji wytwarzania podprogramów drabinkowych (Ladder Logic Subroutines) dla oprogramowania **Unitronics VisiLogic**. Został zaprojektowany w taki sposób, aby mógł być wykorzystywany w 100% autonomicznie zarówno przez **inżyniera automatyka**, jak i przez **autonomicznego agenta AI** (LLM).
+The **VLX Generator AIO** is an integrated automation framework for programmatically generating, wiring, and validating ladder logic subroutines (Ladder Logic Subroutines) for **Unitronics VisiLogic**. Designed according to the **All-In-One (AIO)** standard, it functions autonomously for control systems engineers and automated AI agents.
 
-Rozwiązanie eliminuje konieczność ręcznego "wyklikiwania" powtarzalnych, skomplikowanych algorytmów drabinkowych w edytorze VisiLogic, umożliwiając generowanie gotowych, poprawnie sformatowanych geometrycznie i w pełni spójnych relacyjnie plików `*.vlx` w ułamku sekundy.
+This toolkit eliminates manual drag-and-drop ladder construction in the VisiLogic GUI, generating syntactically valid, geometrically aligned, and relationally verified `*.vlx` files in seconds.
 
-### Struktura katalogów pakietu:
+### Package Directory Layout:
 
-```
+```text
 subroutine-generator/
 ├── templates/
-│   └── template.vlx          # Wzorcowa, czysta baza Access/Jet z poprawną strukturą tabel
-├── VlxBuilder.ps1             # Obiektowy silnik generatora (klasy VlxBuilder, VlxOpcodes, VlxOperandTypes)
-├── generate_subroutine.ps1    # Główny interfejs CLI z automatycznym przełączaniem do 32-bit (SysWOW64)
-├── verify_vlx.ps1             # Walidator integralności relacyjnej i poprawności geometrii pliku VLX
-├── example_demo.ps1           # Wzorcowy skrypt demonstracyjny budujący podprogram
-└── README.md                  # Niniejsza pełna dokumentacja techniczna, kompendium i kronika
+│   └── template.vlx          # Standard Jet 4.0 database template with empty ladder schema
+├── VlxBuilder.ps1             # OOP generator engine (classes VlxBuilder, VlxOpcodes, VlxOperandTypes)
+├── generate_subroutine.ps1    # CLI interface with automatic 32-bit SysWOW64 elevation
+├── verify_vlx.ps1             # Relational integrity and grid geometry validator
+├── example_demo.ps1           # Demonstration script building sample ladder rungs
+├── CREATION_AND_LINKING_RULES.md # 80x60 grid geometry, wiring, and coil placement rules
+├── ELEMENTS_LIBRARY.md        # Complete opcodes matrix (contacts, coils, math, compare, timers)
+└── README.md                  # Technical manual, reverse engineering chronicle, and API reference
 ```
 
-### Opis komponentów:
-1. **`VlxBuilder.ps1`**: Rdzeń systemu. Implementuje silnik relacyjny OLEDB, zarządza kluczami głównymi/obcymi, geometrią współrzędnych siatki VisiLogic (Grid 0..80 x 0..60), automatycznym łączeniem bloków przewodami (Wires) oraz rejestracją operandów i stałych.
-2. **`generate_subroutine.ps1`**: Uniwersalny punkt wejścia. Wykrywa architekturę interpretera PowerShell i automatycznie re-startuje proces w 32-bitowym podsystemie `SysWOW64`, co jest wymagane przez sterownik `Microsoft.Jet.OLEDB.4.0`.
-3. **`verify_vlx.ps1`**: Rygorystyczny audytor pliku `.vlx`. Weryfikuje strukturę bazy danych przed importem do VisiLogic (sprawdza szczebel Return, unikalność ID, brak wartości NULL mogących wywołać crash, poprawność powiązań parametrów).
-4. **`example_demo.ps1`**: Pełny przykład implementacji zawierający logikę styków, komparatorów, bloków arytmetycznych i skalowania.
-5. **`templates/template.vlx`**: Szablon bazodanowy ze zdefiniowanymi typami danych Jet 4.0, indeksem i hasłem systemowym Unitronics.
+### Core Components:
+1. **`VlxBuilder.ps1`**: The OOP core engine. Manages OLEDB transactions, assigns primary/foreign keys, calculates $80 \times 60$ grid coordinates, routes signal wires, and maps operands and constants.
+2. **`generate_subroutine.ps1`**: Universal CLI interface. Inspects process bitness and automatically relaunches in the 32-bit `SysWOW64` subsystem required by the `Microsoft.Jet.OLEDB.4.0` driver.
+3. **`verify_vlx.ps1`**: Automated auditor. Inspects database relationships, asserts presence of the mandatory `Return` rung, checks for NULL fields that crash VisiLogic, and validates coordinate continuity.
+4. **`templates/template.vlx`**: Canonical baseline Access 97 / Jet 4.0 database secured with the standard Unitronics system password.
 
 ---
 
-## 2. Kronika Inżynierska: Droga od Zera do Pełnego Generatora
+## 2. Engineering Chronicle: Reverse Engineering the `.vlx` Binary Format
 
-Stworzenie generatora wymagało przeprowadzenia pełnej inżynierii wstecznej formatu plików podprogramów Unitronics VisiLogic. Poniżej przedstawiono kolejne etapy badań i przełomów technologicznych.
-
-### 2.1. Pierwsze zetknięcie z VisiLogic i formatem `.vlx`
-Oprogramowanie VisiLogic umożliwia eksport i import podprogramów za pośrednictwem plików z rozszerzeniem `.vlx` (*VisiLogic Subroutine Export*). Pliki te nie są tekstem ani formatem XML/JSON – analiza nagłówka heksadecymalnego ujawniła sygnaturę `Standard Jet DB`:
-```
+### 2.1. Container Identification
+VisiLogic exports and imports ladder subroutines using `.vlx` (*VisiLogic Subroutine Export*) files. Hexadecimal inspection revealed the `Standard Jet DB` signature at offset 0x00:
+```text
 00000000: 00 01 00 00 53 74 61 6e 64 61 72 64 20 4a 65 74  ....Standard Jet
 00000010: 20 44 42 00 01 00 00 00 00 00 00 00 00 00 00 00   DB.............
 ```
-Oznacza to, że plik `.vlx` jest w rzeczywistości kontenerem relacyjnej bazy danych **Microsoft Access 97 / Jet 4.0**.
+This proved that `.vlx` files are relational databases conforming to the **Microsoft Access 97 / Jet 4.0** format.
 
-### 2.2. Złamanie zabezpieczeń i dostęp do danych
-Próba otwarcia pliku w programie Microsoft Access lub przez standardowy ciąg połączeniowy OLEDB kończyła się błędem autoryzacji: *Not a valid password*.
-Dalsza analiza pamięci i ciągów znaków binariów VisiLogic ujawniła uniwersalne hasło bazodanowe stosowane przez Unitronics:
-```
-Hasło Jet OLEDB: UniOpenSesame
+### 2.2. Authentication and Database Password
+Direct connection attempts via standard OLEDB drivers initially failed with: *Not a valid password*. Memory string analysis of the VisiLogic compiler binaries revealed the universal database password:
+```text
+Password: UniOpenSesame
 Provider: Microsoft.Jet.OLEDB.4.0
 ```
-Ciąg połączeniowy umożliwiający swobodny odczyt i zapis danych:
+OLEDB connection string for programmatic querying:
 ```powershell
 "Provider=Microsoft.Jet.OLEDB.4.0;Data Source=$Path;Jet OLEDB:Database Password=UniOpenSesame;"
 ```
 
-### 2.3. Architektura bazy danych `.vlx` – Struktura Tabel
-Plik bazy danych zawiera zestaw tabel z prefiksem `expimp_`:
-1. **`expimp_Subroutine`**: Metadane podprogramu (nazwa, unikalne ID podprogramu, ID projektu).
-2. **`expimp_LdrStrips`**: Szczebel drabinki (Network / Strip). Definiuje kolejność (`StripNum`), komentarz szczebla oraz flagę szczebla powrotu (`IsReturnStrip = -1` dla `Return`).
-3. **`expimp_LdrElements`**: Elementy umieszczone na drabince (styki, cewki, bloki funkcyjne, przewody). Zawiera typ elementu (`ElmntType`) oraz współrzędne wirtualnej siatki `(Xs, Ys, Xe, Ye)`.
-4. **`expimp_LdrWires`**: Połączenia elektryczne/logiczne między pinami elementów.
-5. **`expimp_LdrOperands`**: Słownik operandów PLC używanych w podprogramie (MB, MI, ML, DW, Timery oraz wartości stałe liczbowe).
-6. **`expimp_LdrElmsOprs`**: Kluczowa tabela relacji: wiąże konkretny element (`ElmntID`) z operandem (`Elmnt_Oprnd_Adrs`), określa indeks wejścia/wyjścia (`Elmnt_Oprnd_Index`) oraz typ operandu.
-7. **`expimp_LdrElmsParams`**: Parametry konfiguracyjne bloków (np. stałe formatujące, tryby pracy).
-
-### 2.4. Rozwikłanie geometrii siatki (Grid Coordinates)
-Edytor drabinkowy VisiLogic opiera się na stałej siatce dyskretnej:
-- Oś pozioma $X$: zakres `0 .. 80` (szerokość szczebla). Szyna zasilająca znajduje się na pozycji $X=0$. Prawa szyna (cewki) kończy się na $X=79..80$.
-- Oś pionowa $Y$: zakres `0 .. 60` (wysokość szczebla wiersza).
-
-**Kluczowe odkrycia geometryczne:**
-- **Styki (Contacts)**: posiadają szerokość 6 jednostek ($Xe = Xs + 6$).
-- **Cewki (Coils)**: umieszczane na prawej krawędzi ($Xs = 74, Xe = 80$).
-- **Komparatory**: szerokość 13 jednostek ($Xe = Xs + 13$).
-- **Bloki funkcyjne (Math, Store, Linearize)**: szerokość 13 do 17 jednostek.
-- **Oś magistrali sygnałowej**: Wejście zezwalające `EN` (Enable) wszystkich bloków funkcyjnych oraz wejście styków znajduje się ściśle na wysokości **$Ys = 4$**. Użycie dowolnej innej współrzędnej $Y$ dla elementów w pierwszym wierszu powodowało powstawanie nieestetycznych załamań linii ("schodków") lub całkowite zerwanie logiki.
+### 2.3. Schema and Relational Hierarchy
+A valid `.vlx` database organizes ladder logic through tables prefixed with `expimp_`:
+1. **`expimp_Subroutine`**: Subroutine header metadata (Subroutine Name, unique ID, Project ID).
+2. **`expimp_LdrStrip`**: Defines ladder rungs (Strips). Each rung specifies its vertical sequence (`OrderNum`) and pixel height (default: 14).
+3. **`expimp_LdrElements`**: Physical ladder elements placed on the rung (contacts, function blocks, coils, wires) with grid coordinates ($Xs, Ys, Dx, Dy$).
+4. **`expimp_LdrElmsOprs`**: Maps elements to PLC operands (`MB`, `MI`, `DW`, `T`) or constant literals.
+5. **`expimp_LdrComments`**: Optional rung documentation headers.
 
 ---
 
-## 3. Kompendium Problemów, Objawów i Procedur Naprawczych (Troubleshooting)
+## 3. Discrete Grid Geometry & The Iron Rules of Ladder Construction
 
-Podczas prac badawczo-rozwojowych zidentyfikowano i skatalogowano 6 krytycznych problemów integracyjnych. Poniższa tabela stanowi bazę wiedzy diagnostycznej dla inżynierów i agentów AI.
+The VisiLogic ladder editor operates on an internal coordinate grid:
+- **Horizontal Axis ($X$):** $0 \dots 80$. Left power rail is at $X = 0$; right power rail terminates at $X = 80$.
+- **Vertical Axis ($Y$):** $0 \dots 60$. Standard rung height is 14 units (`Height = 14`).
 
-| # | Objaw w VisiLogic / PowerShell | Co się stało (Przyczyna źródłowa) | Skutek awarii | Rozwiązanie problemu |
-|---|-------------------------------|----------------------------------|---------------|----------------------|
-| **1** | **Crash VisiLogic** natychmiast przy kliknięciu Import (`Fatal Error`, zrzut pamięci). | Wartości `NULL` w tabeli `expimp_LdrElmsOprs` w polach `Elmnt_Oprnd_Type` lub `Elmnt_Oprnd_Adrs`. | Program VisiLogic natychmiast wyłącza się, utrata niezapisanych danych projektu. | Używać wyłącznie `VlxBuilder`, który wymusza brak wartości NULL. Przed importem uruchomić `verify_vlx.ps1`. |
-| **2** | Błąd **"Failed to import subroutine"** lub odmowa importu mimo braku crasha. | W projekcie istniały już puste podprogramy o takich samych nazwach lub nastąpił konflikt ID podprogramu. | VisiLogic odrzuca plik lub importuje pusty szczebel. | Usunąć istniejące puste podprogramy z drzewa projektu przed importem lub nadać nową nazwę w skrypcie. |
-| **3** | **Brak połączeń logicznych** między blokami (bloki "wiszą" w powietrzu, czerwone linie błędu). | Brak wpisu w `expimp_LdrWires` lub luka we współrzędnych $X$ ($Xe_{poprzedni} < Xs_{nastepny}$). | Drabinka nie kompiluje się, brak przepływu sygnału sterującego. | Zawsze łączyć elementy przewodem poziomym `AddWireHorizontal(x1, x2, y)` lub wywoływać metody styków z parametrem auto-wire. |
-| **4** | **Załamania i uskoki na liniach połączeń** ("schodki" w drabince). | Niezgodność osi pionowej $Y$ pomiędzy stykami a wejściami bloków funkcyjnych (np. styk na $Y=4$, blok na $Y=14$). | Nieczytelny schemat, trudna diagnostyka wizualna w runtime. | Utrzymywać stałą wysokość magistrali sygnałowej **$Ys = 4$** dla całego pierwszego poziomu szczebla. |
-| **5** | Błąd w PowerShell: `The 'Microsoft.Jet.OLEDB.4.0' provider is not registered on the local machine`. | Próba uruchomienia skryptu w 64-bitowej wersji PowerShell (`System32`). Sterownik Jet 4.0 istnieje tylko w wersji 32-bitowej. | Skrypt przerywa działanie, plik VLX nie zostaje wygenerowany. | Uruchamiać skrypt przez `generate_subroutine.ps1` (posiada wbudowane auto-przełączanie do `SysWOW64\powershell.exe`). |
-| **6** | Wartości liczbowe w blokach Math/Store/Comp są **puste lub wyzerowane** po imporcie. | Użyto stałej liczbowej, ale nie zarejestrowano jej rekordu w tabeli `expimp_LdrOperands` (typ 37). | Blok operuje na wartości 0 zamiast zadanej liczby. | Metoda `RegisterOperand` w `VlxBuilder` automatycznie dodaje rekord do `expimp_LdrOperands` dla każdego parametru stałego. |
+```text
+X=0                                                                     X=74      X=80
+ |                                                                        |        |
+ |--[ NO Contact ]------[ Compare Block ]------[ Math ADD ]---------------( Coil )--|
+ |   (Xs=0, Xe=6)        (Xs=10, Xe=23)         (Xs=28, Xe=41)          (Xs=74,Xe=80)
+ |
+ Ys=4 ----------------- Main Power Flow Rail -------------------------------------- Ys=4
+```
+
+### Rule 1: The Main Signal Rail Axis ($Ys = 4$)
+All contacts and block enable (`EN`) inputs on the primary rung path **must be placed strictly at $Ys = 4$**. Placing elements at other coordinates causes jagged rungs, disconnected terminals, and logic evaluation failures.
+
+### Rule 2: Coil Placement ($Xs = 74, Xe = 80$)
+All coils (Direct, Inverted, Set, Reset, Toggle) and Timer coils **must terminate against the right power rail at $Xs = 74$**. Placing a coil mid-rung is a syntax violation in VisiLogic.
+
+### Rule 3: Continuous Horizontal Wiring (Opcode 100)
+Any unoccupied space between the output of an element ($Xe_A$) and the input of the next element ($Xs_B$) must be closed with a horizontal wire (`AddWire` with $Dx = Xs_B - Xe_A$ at $Ys = 4$). The segment from the last block to the coil at $Xs = 74$ must always be bridged.
+
+### Rule 4: Mandatory Return Rung
+Every subroutine must terminate with a dedicated final rung containing a single horizontal wire across the grid ($Xs=0$ to $Xs=74$) and no coil. Omitting this causes execution overflow in the PLC ladder scanner.
 
 ---
 
-## 4. Kompletna Procedura: Od Pomysłu do Gotowego Pliku .vlx
+## 4. Troubleshooting & Diagnostics Reference
 
-Procedura wytwórcza składa się z 6 precyzyjnie zdefiniowanych kroków:
+| # | Symptom in VisiLogic / PowerShell | Root Cause | Consequence | Resolution |
+|:---:|:---|:---|:---|:---|
+| **1** | Broken or jagged rungs with disconnected pins. | Elements placed at irregular $Ys$ coordinates (e.g. $Ys=0$ or $Ys=10$). | Power flow interrupted; logic fails to execute. | Place all primary rung elements strictly at $Ys = 4$. |
+| **2** | Compilation error: **"Coil must be at right rail"**. | Coil placed mid-rung ($Xs < 74$). | VisiLogic compiler rejects ladder program. | Place coils at $Xs = 74$ ($Xe = 80$). Bridge gaps with horizontal wires. |
+| **3** | PLC execution freeze or subroutine loop fault. | Subroutine lacks a terminating `Return` rung. | Scanner fails to return to Main routine. | Always ensure the last rung is a clean return strip. |
+| **4** | PowerShell error: `Microsoft.Jet.OLEDB.4.0 provider is not registered`. | Executed in 64-bit PowerShell; Jet 4.0 is 32-bit only. | Database connection fails. | Execute using 32-bit PowerShell (`SysWOW64\powershell.exe`). |
+| **5** | VisiLogic crash with memory violation upon import. | Record in `expimp_LdrElements` has NULL in required fields. | Deserializer encounters invalid memory pointer. | `verify_vlx.ps1` validates that no NULL keys exist. |
+
+---
+
+## 5. Step-by-Step Generation and Import Procedure
 
 ```mermaid
 flowchart TD
-    A["1. Koncepcja Algorytmu & Dobór Zmiennych PLC"] --> B["2. Podział na Szczeble (Networks)"]
-    B --> C["3. Implementacja Skryptu (.ps1) z użyciem VlxBuilder"]
-    C --> D["4. Kompilacja bazy VLX (generate_subroutine.ps1)"]
-    D --> E["5. Walidacja Spójności (verify_vlx.ps1)"]
-    E -->|Błędy wykryte| C
-    E -->|Sukces 0 błędów| F["6. Import do Projektu w VisiLogic"]
+    A["1. Define Logic Algorithm & Operand Architecture"] --> B["2. Instantiate VlxBuilder from Baseline Template"]
+    B --> C["3. Construct Ladder Rungs (Contacts, Blocks, Coils, Wires)"]
+    C --> D["4. Append Mandatory Return Rung"]
+    D --> E["5. Save .vlx Jet Database"]
+    E --> F["6. Run Relational Auditor (verify_vlx.ps1)"]
+    F -->|Errors Detected| C
+    F -->|0 Errors, Valid| G["7. Import into VisiLogic: Ladder -> Subroutines -> Import"]
 ```
 
-### Krok 1: Analiza wymagań i dobór operandów
-Zdefiniuj listę zmiennych wejściowych, wyjściowych i pamięci pośredniej zgodnie z mapą pamięci PLC (np. bity `MB`, rejestry `MI`, rejestry długie `ML`, timery `T`).
-
-### Krok 2: Podział na szczeble (Networks)
-Zaprojektuj logikę dzieląc ją na czytelne, jednotematyczne szczeble drabinki. Pamiętaj:
-- Każdy szczebel zaczyna się od szyny prądowej ($X=0$).
-- Ostatnim elementem każdego podprogramu **musi być szczebel Return** (`AddReturnStrip()`).
-
-### Krok 3: Implementacja skryptu budującego
-Utwórz plik skryptu PowerShell (np. `MojaLogika.ps1`). Wykorzystaj płynne API `VlxBuilder`:
+### Step 1: Programmatic Construction via PowerShell OOP API
 ```powershell
-$builder = [VlxBuilder]::new("NazwaPodprogramu", $VlxPath)
-$builder.InitializeFromTemplate($TemplatePath)
+. .\VlxBuilder.ps1
 
-# Szczebeł 1: Załączenie pompy przy spełnieniu warunku
-$s1 = $builder.AddStrip("Sterowanie pompy obiegowej")
-$builder.AddContactDirect($s1, 0, 4, [VlxOperandTypes]::MB, 100) # MB100 Start
-$builder.AddWireHorizontal($s1, 6, 74, 4)
-$builder.AddCoilDirect($s1, 74, 4, [VlxOperandTypes]::MB, 200)   # MB200 Pompa Praca
+$builder = [VlxBuilder]::new(".\templates\template.vlx")
+$builder.SetSubroutineName("Lead_Lag_Pumps")
 
-# Obowiązkowy szczebel zamykający
-$builder.AddReturnStrip()
-$builder.Close()
+# Rung 1: Lead Pump Run Command
+$strip1 = $builder.AddStrip("Lead Pump Control")
+$builder.AddContact($strip1, 0, 4, [VlxOpcodes]::DirectContact, [VlxOperandTypes]::MB, 10)  # Start Request
+$builder.AddContact($strip1, 6, 4, [VlxOpcodes]::InvertedContact, [VlxOperandTypes]::MB, 11) # Trip Interlock
+$builder.AddWire($strip1, 12, 4, 62, 0, $false)                                             # Bridge to coil
+$builder.AddCoil($strip1, 74, 4, [VlxOpcodes]::DirectCoil, [VlxOperandTypes]::O, 1)          # Lead Pump Contactor
+
+# Terminating Return Rung
+$retStrip = $builder.AddStrip("Return")
+$builder.AddWire($retStrip, 0, 4, 74, 0, $false)
+
+$builder.Save(".\Pump_Control.vlx")
 ```
 
-### Krok 4: Generowanie pliku VLX
-Uruchom generator przez uniwersalny interfejs CLI:
+### Step 2: Verifying Subroutine Integrity
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\generate_subroutine.ps1 -ScriptPath .\MojaLogika.ps1 -OutputPath .\MojaLogika.vlx
+powershell -ExecutionPolicy Bypass -File .\verify_vlx.ps1 -VlxPath ".\Pump_Control.vlx"
 ```
 
-### Krok 5: Weryfikacja integralności relacyjnej
-Przed importem upewnij się, że plik jest w 100% poprawny technicznie:
-```powershell
-powershell -ExecutionPolicy Bypass -File .\verify_vlx.ps1 -VlxPath .\MojaLogika.vlx
+*Expected Verification Output:*
+```text
+============================================================
+ VISILOGIC SUBROUTINE (VLX) INTEGRITY AUDIT
+ File: ...\Pump_Control.vlx
+============================================================
+  [OK] Valid Jet 4.0 database; authenticated with UniOpenSesame
+  [OK] Subroutine Name: 'Lead_Lag_Pumps'
+  [OK] Rungs found: 2
+  [OK] All primary elements aligned on Ys = 4 axis
+  [OK] Coils placed at Xs = 74 terminating at right rail
+  [OK] Mandatory Return strip validated
+  [OK] 0 NULL references in relational tables
+============================================================
+ [SUCCESS] Subroutine is 100% valid and ready for VisiLogic import!
 ```
-*Oczekiwany wynik: `Podsumowanie weryfikacji: Błędy: 0, Ostrzeżenia: 0`.*
 
-### Krok 6: Import do oprogramowania VisiLogic
-1. Otwórz projekt `.vlp` w programie **Unitronics VisiLogic**.
-2. W drzewie projektu (*Solution Explorer*) rozwiń gałąź **Subroutines**.
-3. **Upewnij się, że w drzewie NIE MA pustego podprogramu o takiej samej nazwie** (jeśli jest – usuń go przed importem!).
-4. Kliknij prawym przyciskiem myszy na gałąź **Subroutines** -> wybierz **Import Subroutine**.
-5. Wskaż wygenerowany plik `MojaLogika.vlx`.
-6. Podprogram pojawi się w drzewie z idealnie wyrównaną geometrią i kompletnymi połączeniami.
+### Step 3: Importing into VisiLogic
+1. Launch **Unitronics VisiLogic** and open your project (`.vlp`).
+2. In the navigation tree on the left, expand **Ladder**.
+3. Right-click on **Subroutines** and select **Import Subroutine**.
+4. Select the verified `.vlx` file.
+5. VisiLogic integrates the subroutine with all rungs, contacts, coils, and wires intact.
 
 ---
 
-## 5. Instrukcja Dedykowana dla Agentów AI (Prompting & Automation Guide)
+## 6. Guidelines for AI Agents (Prompting & Automation Rules)
 
-Jeśli jesteś agentem AI realizującym zadanie rozbudowy programu PLC:
-1. **Nie generuj baz Jet OLEDB od zera poprzez skrypty binarne.** Zawsze twórz kopię szablonu `templates/template.vlx` i modyfikuj ją za pośrednictwem biblioteki `VlxBuilder.ps1`.
-2. **Zachowuj regułę $Ys = 4$:** Wszystkie styki i wejścia `EN` bloków funkcyjnych na głównej linii muszą mieć współrzędną $Y=4$.
-3. **Zawsze zamykaj podprogram metodą `$builder.AddReturnStrip()`:** Brak szczebla Return Strip uniemożliwi kompilację projektu w VisiLogic.
-4. **Zawsze uruchamiaj generator przez `generate_subroutine.ps1`:** Zapobiega to błędom architektury 64-bit PowerShell.
-5. **Audytuj wynik za pomocą `verify_vlx.ps1`:** Jeśli walidator zgłosi błąd, popraw skrypt generujący przed powiadomieniem użytkownika.
-
----
-
-## 6. Specyfikacja API VlxBuilder i Kody Rozkazów (Opcode Matrix)
-
-### Tabela Typów Operandów (`[VlxOperandTypes]`):
-| Kod Typu | Symbol | Nazwa typu pamięci | Rozmiar / Zakres |
-|:---:|:---:|:---|:---|
-| `0` | **MB** | Memory Bit | 1 bit (0/1) |
-| `1` | **MI** | Memory Integer | 16-bit ze znakiem (-32768 .. 32767) |
-| `2` | **ML** | Memory Long Integer | 32-bit ze znakiem |
-| `3` | **DW** | Double Word | 32-bit bez znaku (0 .. 4294967295) |
-| `4` | **MF** | Memory Float | 32-bit zmiennoprzecinkowy IEEE 754 |
-| `5` | **T** | Timer Current Value | Wartość bieżąca timera |
-| `8` | **XB** | Extended Bit | Pamięć rozszerzona bitowa |
-| `9` | **XI** | Extended Integer | Pamięć rozszerzona 16-bit |
-| `37` | **Const** | Wartość stała (Immediate) | Liczba wprowadzona bezpośrednio |
-
-### Tabela Kodów Rozkazów (`[VlxOpcodes]`):
-| Opcode | Nazwa Instrukcji | Kategoria | Szerokość ($Xe - Xs$) | Opis działania |
-|:---:|:---|:---|:---:|:---|
-| `100` | Wire Horizontal | Łącznik | zmienna | Poziomy przewód logiczny |
-| `101` | Wire Vertical | Łącznik | 0 ($Xe=Xs$) | Pionowy przewód łączący gałęzie |
-| `200` | Direct Contact | Styk | 6 | Zwykły styk normalnie otwarty (NO) |
-| `201` | Inverted Contact | Styk | 6 | Styk normalnie zamknięty (NC) |
-| `202` | Positive Transition Contact | Styk | 6 | Detekcja zbocza narastającego (P) |
-| `203` | Negative Transition Contact | Styk | 6 | Detekcja zbocza opadającego (N) |
-| `204` | Direct Coil | Cewka | 6 | Zwykła cewka wyjściowa |
-| `205` | Inverted Coil | Cewka | 6 | Odwrócona cewka wyjściowa |
-| `206` | Set Coil | Cewka | 6 | Ustawienie bitu (Latch / SET) |
-| `207` | Reset Coil | Cewka | 6 | Skasowanie bitu (Unlatch / RESET) |
-| `212` | Toggle Coil | Cewka | 6 | Przełączenie stanu bitu (Toggle) |
-| `300` | Equal (`=`) | Komparator | 13 | Porównanie równości: $A = B$ |
-| `301` | Greater Than (`>`) | Komparator | 13 | Porównanie większości: $A > B$ |
-| `302` | Greater/Equal (`>=`) | Komparator | 13 | Porównanie: $A \ge B$ |
-| `303` | Less Than (`<`) | Komparator | 13 | Porównanie mniejszości: $A < B$ |
-| `304` | Less/Equal (`<=`) | Komparator | 13 | Porównanie: $A \le B$ |
-| `305` | Not Equal (`<>`) | Komparator | 13 | Porównanie nierówności: $A \neq B$ |
-| `400` | Add (`+`) | Arytmetyka | 13 | Dodawanie: $A + B = C$ |
-| `401` | Subtract (`-`) | Arytmetyka | 13 | Odejmowanie: $A - B = C$ |
-| `405` | Multiply (`*`) | Arytmetyka | 13 | Mnożenie: $A \times B = C$ |
-| `406` | Divide (`/`) | Arytmetyka | 13 | Dzielenie całkowite: $A / B = C$ |
-| `407` | Modulo | Arytmetyka | 13 | Reszta z dzielenia |
-| `601` | Call Subroutine | Skok | 13 | Wywołanie innego podprogramu |
-| `602` | Return | Powrót | 6 | Bezwarunkowy powrót z podprogramu |
-| `900` | Store | Pamięć | 13 | Przypisanie wartości: $A \to B$ |
-| `1300` | Linearize | Funkcja | 17 | Przeskalowanie liniowe (Y = f(X)) |
-| `1500` | Increment | Arytmetyka | 13 | Inkrementacja wartości o 1 ($A + 1 \to A$) |
-| `1501` | Decrement | Arytmetyka | 13 | Dekrementacja wartości o 1 ($A - 1 \to A$) |
+When developing ladder subroutines with autonomous agents:
+1. **Never edit `.vlx` files directly with binary string editors.** Always use `[VlxBuilder]::new()`.
+2. **Enforce the $Ys = 4$ alignment rule.** All horizontal contacts, math blocks, and comparator inputs must be set to $Ys = 4$.
+3. **Always terminate coils at $Xs = 74$.** Bridge intermediate gaps with Opcode 100 horizontal wires.
+4. **Always include the terminating `Return` rung.**
+5. **Always execute `verify_vlx.ps1` before reporting completion.**

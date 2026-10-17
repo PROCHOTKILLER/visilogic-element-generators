@@ -1,8 +1,8 @@
 <PLC_DB>
   <Table TABLE_ID="1">
-    <FieldsCount>7</FieldsCount>
+    <FieldsCount>5</FieldsCount>
     <RowsCount>10</RowsCount>
-    <Description>Recipe_Process</Description>
+    <Description>Recipe_Headers</Description>
     <Column COL_ID="Column 0">
       <FieldType>2</FieldType>
       <Size>2</Size>
@@ -15,89 +15,59 @@
       <MinValue>1</MinValue>
       <MaxValue>10</MaxValue>
       <FormatView>1</FormatView>
-      <Description>Krok_Id</Description>
+      <Description>Recipe_ID</Description>
       <ElementsDescriptions></ElementsDescriptions>
     </Column>
     <Column COL_ID="Column 1">
       <FieldType>6</FieldType>
-      <Size>16</Size>
+      <Size>20</Size>
       <ElementsCount>1</ElementsCount>
       <Key>2</Key>
-      <StringLength>16</StringLength>
+      <StringLength>20</StringLength>
       <ReadOnly>False</ReadOnly>
       <PartOfProject>False</PartOfProject>
       <FormatView>1</FormatView>
       <MinValue>-32768</MinValue>
       <MaxValue>32767</MaxValue>
       <FormatView>1</FormatView>
-      <Description>Nazwa_Fazy</Description>
+      <Description>Recipe_Name</Description>
       <ElementsDescriptions></ElementsDescriptions>
     </Column>
     <Column COL_ID="Column 2">
-      <FieldType>3</FieldType>
-      <Size>4</Size>
+      <FieldType>2</FieldType>
+      <Size>2</Size>
       <ElementsCount>1</ElementsCount>
       <Key>3</Key>
-      <StringLength>0</StringLength>
-      <ReadOnly>False</ReadOnly>
-      <PartOfProject>False</PartOfProject>
-      <FormatView>1</FormatView>
-      <MinValue>0</MinValue>
-      <MaxValue>86400</MaxValue>
-      <FormatView>1</FormatView>
-      <Description>Czas_Trwania_s</Description>
-      <ElementsDescriptions></ElementsDescriptions>
-    </Column>
-    <Column COL_ID="Column 3">
-      <FieldType>2</FieldType>
-      <Size>2</Size>
-      <ElementsCount>1</ElementsCount>
-      <Key>4</Key>
-      <StringLength>10</StringLength>
-      <ReadOnly>False</ReadOnly>
-      <PartOfProject>False</PartOfProject>
-      <FormatView>1</FormatView>
-      <MinValue>0</MinValue>
-      <MaxValue>1200</MaxValue>
-      <FormatView>1</FormatView>
-      <Description>Temperatura_01C</Description>
-      <ElementsDescriptions></ElementsDescriptions>
-    </Column>
-    <Column COL_ID="Column 4">
-      <FieldType>2</FieldType>
-      <Size>2</Size>
-      <ElementsCount>1</ElementsCount>
-      <Key>5</Key>
-      <StringLength>10</StringLength>
-      <ReadOnly>False</ReadOnly>
-      <PartOfProject>False</PartOfProject>
-      <FormatView>1</FormatView>
-      <MinValue>0</MinValue>
-      <MaxValue>1000</MaxValue>
-      <FormatView>1</FormatView>
-      <Description>Wilgotnosc_01RH</Description>
-      <ElementsDescriptions></ElementsDescriptions>
-    </Column>
-    <Column COL_ID="Column 5">
-      <FieldType>2</FieldType>
-      <Size>2</Size>
-      <ElementsCount>1</ElementsCount>
-      <Key>6</Key>
       <StringLength>10</StringLength>
       <ReadOnly>False</ReadOnly>
       <PartOfProject>False</PartOfProject>
       <FormatView>1</FormatView>
       <MinValue>1</MinValue>
-      <MaxValue>3</MaxValue>
+      <MaxValue>20</MaxValue>
       <FormatView>1</FormatView>
-      <Description>Tryb_Pracy</Description>
+      <Description>Total_Steps</Description>
       <ElementsDescriptions></ElementsDescriptions>
     </Column>
-    <Column COL_ID="Column 6">
+    <Column COL_ID="Column 3">
+      <FieldType>3</FieldType>
+      <Size>4</Size>
+      <ElementsCount>1</ElementsCount>
+      <Key>4</Key>
+      <StringLength>0</StringLength>
+      <ReadOnly>False</ReadOnly>
+      <PartOfProject>False</PartOfProject>
+      <FormatView>1</FormatView>
+      <MinValue>0</MinValue>
+      <MaxValue>50000</MaxValue>
+      <FormatView>1</FormatView>
+      <Description>Target_Volume_L</Description>
+      <ElementsDescriptions></ElementsDescriptions>
+    </Column>
+    <Column COL_ID="Column 4">
       <FieldType>1</FieldType>
       <Size>1</Size>
       <ElementsCount>1</ElementsCount>
-      <Key>7</Key>
+      <Key>5</Key>
       <StringLength>10</StringLength>
       <ReadOnly>False</ReadOnly>
       <PartOfProject>False</PartOfProject>
@@ -105,94 +75,19 @@
       <MinValue>0</MinValue>
       <MaxValue>1</MaxValue>
       <FormatView>1</FormatView>
-      <Description>Wentylacja_Zezwolenie</Description>
+      <Description>Is_Active</Description>
       <ElementsDescriptions></ElementsDescriptions>
     </Column>
   </Table>
   <Table TABLE_ID="2">
-    <FieldsCount>6</FieldsCount>
-    <RowsCount>4</RowsCount>
-    <Description>PID_Config</Description>
+    <FieldsCount>7</FieldsCount>
+    <RowsCount>50</RowsCount>
+    <Description>Recipe_Steps</Description>
     <Column COL_ID="Column 0">
-      <FieldType>6</FieldType>
-      <Size>16</Size>
+      <FieldType>2</FieldType>
+      <Size>2</Size>
       <ElementsCount>1</ElementsCount>
       <Key>1</Key>
-      <StringLength>16</StringLength>
-      <ReadOnly>False</ReadOnly>
-      <PartOfProject>False</PartOfProject>
-      <FormatView>1</FormatView>
-      <MinValue>-32768</MinValue>
-      <MaxValue>32767</MaxValue>
-      <FormatView>1</FormatView>
-      <Description>Nazwa_Petli</Description>
-      <ElementsDescriptions></ElementsDescriptions>
-    </Column>
-    <Column COL_ID="Column 1">
-      <FieldType>4</FieldType>
-      <Size>4</Size>
-      <ElementsCount>1</ElementsCount>
-      <Key>2</Key>
-      <StringLength>10</StringLength>
-      <ReadOnly>False</ReadOnly>
-      <PartOfProject>False</PartOfProject>
-      <FormatView>1</FormatView>
-      <MinValue>0</MinValue>
-      <MaxValue>10000</MaxValue>
-      <FormatView>1</FormatView>
-      <Description>Wspolczynnik_Kp</Description>
-      <ElementsDescriptions></ElementsDescriptions>
-    </Column>
-    <Column COL_ID="Column 2">
-      <FieldType>3</FieldType>
-      <Size>4</Size>
-      <ElementsCount>1</ElementsCount>
-      <Key>3</Key>
-      <StringLength>0</StringLength>
-      <ReadOnly>False</ReadOnly>
-      <PartOfProject>False</PartOfProject>
-      <FormatView>1</FormatView>
-      <MinValue>0</MinValue>
-      <MaxValue>999999</MaxValue>
-      <FormatView>1</FormatView>
-      <Description>Czas_Zdwojenia_Ti</Description>
-      <ElementsDescriptions></ElementsDescriptions>
-    </Column>
-    <Column COL_ID="Column 3">
-      <FieldType>3</FieldType>
-      <Size>4</Size>
-      <ElementsCount>1</ElementsCount>
-      <Key>4</Key>
-      <StringLength>0</StringLength>
-      <ReadOnly>False</ReadOnly>
-      <PartOfProject>False</PartOfProject>
-      <FormatView>1</FormatView>
-      <MinValue>0</MinValue>
-      <MaxValue>999999</MaxValue>
-      <FormatView>1</FormatView>
-      <Description>Czas_Wyprzedzenia_Td</Description>
-      <ElementsDescriptions></ElementsDescriptions>
-    </Column>
-    <Column COL_ID="Column 4">
-      <FieldType>4</FieldType>
-      <Size>4</Size>
-      <ElementsCount>1</ElementsCount>
-      <Key>5</Key>
-      <StringLength>10</StringLength>
-      <ReadOnly>False</ReadOnly>
-      <PartOfProject>False</PartOfProject>
-      <FormatView>1</FormatView>
-      <MinValue>0</MinValue>
-      <MaxValue>4294967295</MaxValue>
-      <FormatView>1</FormatView>
-      <Description>Maska_Alarmow</Description>
-      <ElementsDescriptions></ElementsDescriptions>
-    </Column>
-    <Column COL_ID="Column 5">
-      <FieldType>5</FieldType>
-      <Size>1</Size>
-      <ElementsCount>1</ElementsCount>
-      <Key>6</Key>
       <StringLength>10</StringLength>
       <ReadOnly>False</ReadOnly>
       <PartOfProject>False</PartOfProject>
@@ -200,7 +95,97 @@
       <MinValue>1</MinValue>
       <MaxValue>10</MaxValue>
       <FormatView>1</FormatView>
-      <Description>Priorytet</Description>
+      <Description>Recipe_ID</Description>
+      <ElementsDescriptions></ElementsDescriptions>
+    </Column>
+    <Column COL_ID="Column 1">
+      <FieldType>2</FieldType>
+      <Size>2</Size>
+      <ElementsCount>1</ElementsCount>
+      <Key>2</Key>
+      <StringLength>10</StringLength>
+      <ReadOnly>False</ReadOnly>
+      <PartOfProject>False</PartOfProject>
+      <FormatView>1</FormatView>
+      <MinValue>1</MinValue>
+      <MaxValue>20</MaxValue>
+      <FormatView>1</FormatView>
+      <Description>Step_Number</Description>
+      <ElementsDescriptions></ElementsDescriptions>
+    </Column>
+    <Column COL_ID="Column 2">
+      <FieldType>2</FieldType>
+      <Size>2</Size>
+      <ElementsCount>1</ElementsCount>
+      <Key>3</Key>
+      <StringLength>10</StringLength>
+      <ReadOnly>False</ReadOnly>
+      <PartOfProject>False</PartOfProject>
+      <FormatView>1</FormatView>
+      <MinValue>1</MinValue>
+      <MaxValue>8</MaxValue>
+      <FormatView>1</FormatView>
+      <Description>Operation_Type</Description>
+      <ElementsDescriptions></ElementsDescriptions>
+    </Column>
+    <Column COL_ID="Column 3">
+      <FieldType>2</FieldType>
+      <Size>2</Size>
+      <ElementsCount>1</ElementsCount>
+      <Key>4</Key>
+      <StringLength>10</StringLength>
+      <ReadOnly>False</ReadOnly>
+      <PartOfProject>False</PartOfProject>
+      <FormatView>1</FormatView>
+      <MinValue>0</MinValue>
+      <MaxValue>1500</MaxValue>
+      <FormatView>1</FormatView>
+      <Description>Set_Temp_C</Description>
+      <ElementsDescriptions></ElementsDescriptions>
+    </Column>
+    <Column COL_ID="Column 4">
+      <FieldType>2</FieldType>
+      <Size>2</Size>
+      <ElementsCount>1</ElementsCount>
+      <Key>5</Key>
+      <StringLength>10</StringLength>
+      <ReadOnly>False</ReadOnly>
+      <PartOfProject>False</PartOfProject>
+      <FormatView>1</FormatView>
+      <MinValue>0</MinValue>
+      <MaxValue>1500</MaxValue>
+      <FormatView>1</FormatView>
+      <Description>Agitator_Speed_RPM</Description>
+      <ElementsDescriptions></ElementsDescriptions>
+    </Column>
+    <Column COL_ID="Column 5">
+      <FieldType>3</FieldType>
+      <Size>4</Size>
+      <ElementsCount>1</ElementsCount>
+      <Key>6</Key>
+      <StringLength>0</StringLength>
+      <ReadOnly>False</ReadOnly>
+      <PartOfProject>False</PartOfProject>
+      <FormatView>1</FormatView>
+      <MinValue>0</MinValue>
+      <MaxValue>86400</MaxValue>
+      <FormatView>1</FormatView>
+      <Description>Dwell_Time_s</Description>
+      <ElementsDescriptions></ElementsDescriptions>
+    </Column>
+    <Column COL_ID="Column 6">
+      <FieldType>3</FieldType>
+      <Size>4</Size>
+      <ElementsCount>1</ElementsCount>
+      <Key>7</Key>
+      <StringLength>0</StringLength>
+      <ReadOnly>False</ReadOnly>
+      <PartOfProject>False</PartOfProject>
+      <FormatView>1</FormatView>
+      <MinValue>0</MinValue>
+      <MaxValue>50000</MaxValue>
+      <FormatView>1</FormatView>
+      <Description>Acid_Dose_ml</Description>
       <ElementsDescriptions></ElementsDescriptions>
     </Column>
   </Table>

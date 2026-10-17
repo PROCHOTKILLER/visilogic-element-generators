@@ -1,66 +1,62 @@
-# Generator Tabel Danych VisiLogic (Data Tables XML Generator AIO)
-### Kompletny pakiet narzędziowy All-In-One do generowania, konfiguracji i walidacji struktury tabel danych `Data_table.xml` dla sterowników PLC Unitronics (seria Vision / V350)
+# VisiLogic Data Tables Generator (Data Tables XML Generator AIO)
+### Complete All-In-One Toolkit for Generating, Configuring, and Validating `Data_table.xml` Structures for Unitronics Vision Series PLCs (V130, V350, V570, V1040, V1210)
 
 ---
 
-## 1. Wstęp i Architektura Rozwiązania (AIO)
+## 1. Introduction and Architecture (AIO)
 
-Pakiet **Data Tables XML Generator AIO** to zintegrowane, profesjonalne środowisko automatyzacji tworzenia i walidacji bazodanowych tabel danych (**Data Tables**) dla oprogramowania **Unitronics VisiLogic**. Został zaprojektowany w standardzie **All-In-One (AIO)**, co oznacza, że może być wykorzystywany w 100% autonomicznie zarówno przez **inżyniera automatyka**, jak i przez **autonomicznego agenta AI** (LLM).
+The **Data Tables XML Generator AIO** is an integrated automation framework for programmatically building and validating tabular databases (**Data Tables**) for **Unitronics VisiLogic**. Designed according to the **All-In-One (AIO)** standard, it functions autonomously for both **control systems engineers** and **autonomous AI agents**.
 
-W sterownikach Unitronics Vision (np. V350) moduł **Data Tables** pełni funkcję wewnętrznej relacyjno-tabelarycznej bazy danych w pamięci SRAM i pamięci Flash sterownika. Wykorzystywany jest do przechowywania:
-- Wielokrokowych receptur technologicznych (np. czas, temperatura, wilgotność, tryby pracy suszarni),
-- Dzienników zdarzeń i archiwizacji parametrów procesowych (Data Logging),
-- Tabel kalibracyjnych czujników oraz tabel linearyzacji nieliniowych sygnałów wejściowych,
-- Parametrów konfiguracji urządzeń wykonawczych, falowników i pętli PID.
+In Unitronics Vision controllers, the **Data Tables** module functions as an embedded relational database allocated within PLC SRAM and Flash memory. Typical industrial applications include:
+- Multi-step process recipes (step times, target temperatures, speed references, cycle modes),
+- Shift production logging and OEE tracking,
+- High-resolution alarm audit trails and timestamped fault logs,
+- Sensor linearization tables and multi-point calibration curves,
+- PID loop tuning parameters and drive configuration registers.
 
-Ręczne "wyklikiwanie" dziesiątek kolumn, ustalanie ich rozmiarów, zakresów dopuszczalnych nastaw i typów danych w powolnym graficznym interfejsie VisiLogic jest pracochłonne i podatne na pomyłki. Pakiet ten w pełni rozwiązuje ten problem:
-- Gwarantuje **100% zgodności ze specyfikacją wewnętrznego silnika XML VisiLogic** (`<PLC_DB>`).
-- Wykorzystuje **inżynierię wsteczną natywnej biblioteki COM `UnPlcDB1.dll`**, umożliwiając deterministyczną weryfikację pliku przed jego zaimportowaniem do projektu.
-- Posiada pełny interfejs obiektowy (klasy PowerShell 5.1+), konsolowy interfejs CLI oraz dedykowany generator dla projektu Komora Suszarnicza nr 9.
+Manually entering dozens of columns, configuring field types, setting boundary limits, and adjusting display widths through the VisiLogic GUI is time-consuming and prone to human error. This toolkit completely automates that workflow:
+- Guarantees **100% compliance with the internal VisiLogic XML specification** (`<PLC_DB>`).
+- Leverages **reverse-engineering of the native 32-bit COM library `UnPlcDB1.dll`** to deterministically verify files prior to importing into VisiLogic.
+- Provides an object-oriented PowerShell API (`DataTableBuilder.ps1`), a versatile CLI interface (`generate_data_tables.ps1`), and pre-verified industrial templates.
 
-### Struktura katalogów pakietu:
+### Package Directory Layout:
 
-```
+```text
 data-tables-generator/
 ├── templates/
-│   └── template_data_table.xml         # Czysty, wzorcowy szablon struktury Data Table XML
-├── DataTableBuilder.ps1                # Obiektowy silnik generatora (klasy DataTableBuilder, DataTableDefinition, DataColumnDefinition)
-├── generate_data_tables.ps1            # Główny interfejs CLI (tworzenie tabel z parametrów, pliku JSON lub CSV)
-├── verify_data_tables.ps1              # Rygorystyczny walidator integralności z mostkiem 32-bit SysWOW64 dla COM
-├── example_demo_data_tables.ps1        # Wzorcowy skrypt demonstracyjny budujący bazę wielotabelową
-├── generate_project_data_tables.ps1    # Dedykowany generator produkcyjny tabeli receptur (DT_Recipe_Steps.xml)
-├── run_ultimate_test.ps1               # Ostateczny skrypt testowy (stress test: 4 tabele, 37 kolumn, 9 typów danych)
-├── DEMO_DATA_TABLES.xml                # Zweryfikowany, przykładowy plik demonstracyjny
-├── ULTIMATE_TEST_DATA_TABLES.xml       # Wynikowy plik ostatecznego testu (DesignBlock: 886 bajtów)
-└── README.md                           # Niniejsza pełna dokumentacja techniczna, kompendium i kronika
+│   └── template_data_table.xml         # Canonical, clean Data Table XML schema template
+├── DataTableBuilder.ps1                # OOP generator engine (classes DataTableBuilder, DataTableDefinition, DataColumnDefinition)
+├── generate_data_tables.ps1            # CLI interface (generates tables from CLI params, JSON, or CSV headers)
+├── verify_data_tables.ps1              # Strict 12-stage validator with automated 32-bit SysWOW64 COM bridge
+└── README.md                           # Technical manual, reverse engineering chronicle, and API reference
+
+# Application examples and production suites are located in:
+# examples/data-tables/ (Chemical Batch Recipes, Shift Production Logs, Alarm Audit Trails)
 ```
 
-### Opis komponentów pakietu:
-1. **`DataTableBuilder.ps1`**: Zorientowany obiektowo silnik manipulacji strukturą tabel danych. Definiuje wyliczenie `VisiLogicFieldType` (9 typów pamięci) oraz klasy `DataColumnDefinition`, `DataTableDefinition` i `DataTableBuilder`. Obsługuje budowanie struktury XML DOM, zapis z czystym formatowaniem bez nagłówka XML BOM oraz ładowanie z szablonów.
-2. **`generate_data_tables.ps1`**: Uniwersalny punkt wejścia CLI. Umożliwia wygenerowanie kompletnego pliku XML z parametrów wiersza poleceń, z pliku konfiguracyjnego JSON lub automatycznie na podstawie nagłówków istniejącego arkusza CSV.
-3. **`verify_data_tables.ps1`**: Niezależny audytor integralności. Dokonuje 12-etapowej kontroli składniowej i logicznej pliku XML, a następnie łączy się z natywnym 32-bitowym obiektem COM `UnPlcDB1.clsDBServices` w celu weryfikacji kompilacji bloku binarnego `DesignBlock`. Posiada automatyczne przełączanie z 64-bitowego do 32-bitowego środowiska `SysWOW64`.
-4. **`templates/template_data_table.xml`**: Czysta, kanoniczna matryca tabeli danych wyeksportowana bezpośrednio z działającego środowiska VisiLogic, służąca jako bezpieczny punkt startowy.
-5. **`generate_project_data_tables.ps1`**: Skrypt produkcyjny dla projektu Komora 9, generujący zaktualizowaną, 10-kolumnową tabelę receptur suszenia `DT_Recipe_Steps.xml` (20 kroków, pełna numeryzacja Integer + Long).
+### Core Components:
+1. **`DataTableBuilder.ps1`**: The OOP core engine. Defines the `VisiLogicFieldType` enum (covering 6 native types and 3 adapter types) and manages the DOM hierarchy, clean formatting without XML BOM, and template cloning.
+2. **`generate_data_tables.ps1`**: Universal CLI entry point. Supports building tables from command-line arguments, JSON schema files, or CSV headers with automatic type inference.
+3. **`verify_data_tables.ps1`**: Automated integrity auditor. Performs a 12-stage structural and relational validation of the XML file, then connects to the native 32-bit COM object `UnPlcDB1.clsDBServices` to verify binary `DesignBlock` compilation.
+4. **`templates/template_data_table.xml`**: Baseline reference template exported directly from VisiLogic.
 
 ---
 
-## 2. Kronika Inżynierska: Droga od Zera do Pełnego Generatora
+## 2. Engineering Chronicle: Reverse Engineering the VisiLogic Database Engine
 
-Budowa bezbłędnego generatora wymagała przeprowadzenia dogłębnej inżynierii wstecznej silnika baz danych VisiLogic oraz rozwiązania krytycznych rozbieżności pomiędzy dokumentacją nieoficjalną a rzeczywistą implementacją binarną oprogramowania Unitronics.
+Developing an automated generator required in-depth reverse engineering of the VisiLogic database engine to resolve undocumented behaviors and critical disparities between unofficial community documentation and the actual binary implementation.
 
-### 2.1. Pierwsze zetknięcie z eksportem Data Tables w VisiLogic
-W trakcie realizacji projektu użytkownik dostarczył referencyjny plik `Visilogic_projekt_data_table.xml` wyeksportowany z działającego projektu w oprogramowaniu VisiLogic.
-Wcześniejszy szkic generatora opierał się na błędnym założeniu, że właściwości kolumn i tabeli powinny być definiowane jako atrybuty znaczników XML, np.:
+### 2.1. Anatomy of VisiLogic `<PLC_DB>` XML Files
+Initial attempts to generate Data Tables often fail because developers assume XML attributes are used for properties:
 ```xml
-<!-- BŁĘDNA STRUKTURA (stary szkic, powodujący awarię i odrzucenie pliku) -->
+<!-- INCORRECT SCHEMA (Causes silent rejection or crash in VisiLogic) -->
 <Table TABLE_ID="0" FieldsCount="10" RowsCount="20" Description="Recipe_Steps">
   <Column COL_ID="0" FieldType="3" Size="2" Key="0" ReadOnly="0" PartOfProject="1" ... />
 </Table>
 ```
-
-Próba załadowania takiego pliku kończyła się cichym odrzuceniem danych przez VisiLogic lub awarią aplikacji. Analiza pliku wzorcowego ujawniła rzeczywisty, rygorystyczny format:
+Binary inspection of native exports revealed that VisiLogic's parser requires child elements inside `<Column>`:
 ```xml
-<!-- POPRAWNA STRUKTURA AKCEPTOWANA PRZEZ SILNIK VISILOGIC -->
+<!-- VALID VISILOGIC XML SCHEMA -->
 <PLC_DB>
   <Table TABLE_ID="1">
     <FieldsCount>10</FieldsCount>
@@ -73,247 +69,194 @@ Próba załadowania takiego pliku kończyła się cichym odrzuceniem danych prze
       <Key>1</Key>
       <StringLength>10</StringLength>
       <ReadOnly>False</ReadOnly>
-      <PartOfProject>True</PartOfProject>
+      <PartOfProject>False</PartOfProject>
       <FormatView>1</FormatView>
       <MinValue>1</MinValue>
       <MaxValue>20</MaxValue>
       <FormatView>1</FormatView>
-      <Description>Numer_Kroku</Description>
+      <Description>Step_Number</Description>
       <ElementsDescriptions></ElementsDescriptions>
     </Column>
   </Table>
 </PLC_DB>
 ```
 
-### 2.2. Inżynieria wsteczna biblioteki COM `UnPlcDB1.dll`
-Aby zyskać 100% pewności co do poprawności generowanych plików, zbadano architekturę VisiLogic zainstalowanego w systemie:
-- Zlokalizowano kluczową bibliotekę odpowiedzialną za obsługę baz danych PLC:
-  `C:\Program Files (x86)\Unitronics\Unitronics VisiLogic_C\VisiLogic Self Reg DLLs\UnPlcDB1.dll`.
-- Za pomocą interfejsu COM zbadano zarejestrowany serwer automatyzacji OLE: `UnPlcDB1.clsDBServices`.
-- Analiza dekompilacyjna formularzy VB6 (`frmInsertColumn`, `frmImportTables`) oraz kodu procedur deserializacji XML wykazała, że moduł Data Tables w VisiLogic obsługuje **dokładnie 6 natywnych typów kolumn**:
+### 2.2. Reverse Engineering `UnPlcDB1.dll`
+To achieve 100% deterministic generation, we analyzed the native library responsible for PLC database management:
+- Location: `C:\Program Files (x86)\Unitronics\Unitronics VisiLogic_C\VisiLogic Self Reg DLLs\UnPlcDB1.dll`.
+- Registered OLE Automation Server: `UnPlcDB1.clsDBServices`.
+- Disassembly of VB6 forms (`frmInsertColumn` at RVA `0x1B99A`, `frmImportTables` at RVA `0x18BD4`) proved that VisiLogic supports **strictly 6 native column types**:
 
 ```c
-// Dokładny wykaz 6 natywnych typów kolumn modułu Data Tables (UnPlcDB1.dll)
 typedef enum {
-    enFieldType_Flags   = 1,   // Bit / MB (Rozmiar: 1 bajt, Min: 0, Max: 1)
-    enFieldType_Integer = 2,   // Integer / MI (Rozmiar: 2 bajty, 16-bit signed, Min: -32768, Max: 32767)
-    enFieldType_Long    = 3,   // Long / ML (Rozmiar: 4 bajty, 32-bit signed, Min: -2147483648, Max: 2147483647)
-    enFieldType_DW      = 4,   // DWord / MDW (Rozmiar: 4 bajty, 32-bit unsigned, Min: 0, Max: 4294967295)
-    enFieldType_Byte    = 5,   // Byte (Rozmiar: 1 bajt, 8-bit unsigned, Min: 0, Max: 255)
-    enFieldType_String  = 6    // String ASCII (Rozmiar: zmienny, zdefiniowany w Size)
+    enFieldType_Flags   = 1,   // Bit / MB (Size: 1 byte, Min: 0, Max: 1)
+    enFieldType_Integer = 2,   // Integer / MI (Size: 2 bytes, 16-bit signed, Min: -32768, Max: 32767)
+    enFieldType_Long    = 3,   // Long / ML (Size: 4 bytes, 32-bit signed, Min: -2147483648, Max: 2147483647)
+    enFieldType_DW      = 4,   // DWord / MDW (Size: 4 bytes, 32-bit unsigned, Min: 0, Max: 4294967295)
+    enFieldType_Byte    = 5,   // Byte (Size: 1 byte, 8-bit unsigned, Min: 0, Max: 255)
+    enFieldType_String  = 6    // String ASCII (Size: user-defined, 1..50 bytes)
 } enFieldTypes;
 ```
 
-**Kluczowe odkrycie:** W wielu wcześniejszych nieoficjalnych notatkach sugerowano, że typ `Integer` to `3`, a `Long` to `4`. Badanie binarne `UnPlcDB1.dll` oraz pliku referencyjnego użytkownika bezspornie udowodniło, że:
-- `FieldType = 2` to **Integer (16-bit)**,
-- `FieldType = 3` to **Long (32-bit)**,
-- Ustawienie `FieldType = 3` przy rozmiarze `Size = 2` powodowało wewnętrzny konflikt walidacji i natychmiastowe odrzucenie pliku!
+**Critical Discovery**: Prior community notes often asserted that `Integer` was type 3 and `Long` was type 4. Binary inspection proved unequivocally:
+- `FieldType = 2` is **Integer (16-bit, Size = 2)**,
+- `FieldType = 3` is **Long (32-bit, Size = 4)**.
+Specifying `FieldType = 3` with `Size = 2` creates an internal size-mismatch exception that rejects the file.
 
-### 2.3. Osobliwość podwójnego znacznika `<FormatView>`
-Podczas analizy struktury XML odkryto nietypową konstrukcję wokół limitów minimalnych i maksymalnych kolumny:
+### 2.3. The Duplicate `<FormatView>` Tag Quirk
+Inside `<Column>`, the `<FormatView>` tag appears **twice**:
 ```xml
 <FormatView>1</FormatView>
 <MinValue>0</MinValue>
 <MaxValue>1200</MaxValue>
 <FormatView>1</FormatView>
 ```
-Znacznik `<FormatView>` występuje w definicji kolumny **dwukrotnie** — bezpośrednio przed `<MinValue>` oraz bezpośrednio po `<MaxValue>`. Parser silnika `UnPlcDB1.dll` przy sekwencyjnym odczycie oczekuje dokładnie takiego ułożenia węzłów. Brak drugiego domknięcia lub zamiana kolejności powoduje błąd parsowania.
+The sequential XML stream reader in `UnPlcDB1.dll` explicitly expects this exact tag order. Omitting the duplicate closing tag or reordering nodes produces parsing errors.
 
-### 2.4. Mechanizm weryfikacji i pułapka parametru ścieżki w `CreateDesignBlockFromXML`
-W trakcie tworzenia walidatora zbadano metodę `_clsDBServices::CreateDesignBlockFromXML(BSTR)`.
-Początkowo próbowano przekazywać do tej metody surową treść dokumentu XML (`$xmlContent`).
-- Wynik: metoda zwracała tablicę o długości zaledwie **1 bajta** (`0x00`), co oznaczało błąd.
-- Po przekazaniu **ścieżki bezwzględnej do pliku na dysku** (`$xmlFilePath`), silnik sparsował plik i zwrócił poprawny binarny blok danych `DesignBlock` o rozmiarze od 150 do 880+ bajtów!
+### 2.4. Verification Engine via `CreateDesignBlockFromXML`
+The COM method `_clsDBServices::CreateDesignBlockFromXML(BSTR)` compiles the XML table structure into the binary SRAM layout for the PLC.
+- Passing raw XML string content returns a 1-byte error array (`0x00`).
+- Passing the **absolute file path** (`$xmlFilePath`) instructs the engine to parse the file and return the compiled binary `DesignBlock` array (typically 150 to 880+ bytes).
+This allows automated pre-import testing:
+1. `ByteCount <= 1`: Compilation failed due to schema or range violations.
+2. `ByteCount > 1`: VisiLogic compiled the database cleanly; guaranteed error-free import.
 
-To odkrycie umożliwiło stworzenie w 100% deterministycznego audytora integralności:
-1. Jeśli zwrócona tablica bajtów ma rozmiar $\le 1$, plik XML posiada błędy strukturalne i VisiLogic go odrzuci.
-2. Jeśli zwrócona tablica ma rozmiar $> 1$, silnik VisiLogic w pełni skompilował blok bazy danych, co daje gwarancję bezbłędnego importu.
+### 2.5. 32-Bit Execution Bridge (SysWOW64)
+Because `UnPlcDB1.dll` is a 32-bit COM library, executing under a standard 64-bit PowerShell process fails with `Class not registered`. The `verify_data_tables.ps1` script inspects `[IntPtr]::Size`; if running in 64-bit mode (`Size == 8`), it automatically relaunches under `C:\Windows\SysWOW64\WindowsPowerShell\v1.0\powershell.exe`.
 
-### 2.5. Problem architektury 32-bit (x86 / SysWOW64)
-Biblioteka `UnPlcDB1.dll` jest 32-bitowym komponentem Win32. Standardowa 64-bitowa konsola PowerShell (`C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe`) nie jest w stanie utworzyć 32-bitowej instancji COM w procesie (błąd `Class not registered`).
-Rozwiązanie problemu zaimplementowano bezpośrednio w skrypcie `verify_data_tables.ps1`:
-Skrypt bada wskaźnik `[IntPtr]::Size`. Jeśli wynosi on 8 (tryb 64-bitowy), skrypt automatycznie i transparentnie uruchamia proces potomny w środowisku `C:\Windows\SysWOW64\WindowsPowerShell\v1.0\powershell.exe`, zwracając kod błędu i logi do konsoli użytkownika.
+### 2.6. Resolving VB6 `Subscript out of range` (Error 9) and `Automation error` (Error 440)
+Attempting to define columns with type IDs higher than 6 (e.g., 17 for UINT16, 18 for Timer, 19 for Float) triggers:
+1. `UnPlcDB1` – `Run-time error '9': Subscript out of range`.
+2. `VisiLogic` – `Run-time error '440': Automation error`.
+3. Process crash of `VisiLogic.exe`.
 
-### 2.6. Rozwiązanie krytycznego błędu VB6: Run-time error '9': Subscript out of range i Run-time error '440': Automation error
-Podczas pierwszych testów importu bardzo złożonego pliku testowego z wieloma typami danych, użytkownik napotkał krytyczną awarię VisiLogic:
-1. Pierwsze okno błędu: `UnPlcDB1` – `Run-time error '9': Subscript out of range`.
-2. Drugie okno błędu: `VisiLogic` – `Run-time error '440': Automation error`.
-3. Skutek: Natychmiastowe zamknięcie programu i awaria procesu `VisiLogic.exe`.
+**Root Cause**: The internal property arrays in VB6 (`MSVBVM60.DLL`) are hard-coded to bounds `1..6`. Indexing beyond 6 calls `__vbaGenerateBoundsError`.
 
-#### Dogłębna analiza binarna dezasemblacji `UnPlcDB1.dll`:
-- Przeanalizowano formularze VB6 w bibliotece DLL (`frmInsertColumn` pod adresem RVA `0x1B99A` oraz `frmImportTables` pod RVA `0x18BD4`).
-- Kontrolka wyboru typu `cboFieldType` zawiera **ściśle 6 pozycji** (`String`, `Flags`, `Byte`, `Integer`, `Long`, `DW`).
-- Wewnętrzne tablice właściwości (nazwy typów, domyślne limity, walidatory) w kodzie VB6 mają sztywno zadeklarowany zakres indeksów `1..6`.
-- W procedurze deserializacji XML (pod adresem wirtualnym VA `0x1361FFD2`) wartość odczytana ze znacznika `<FieldType>` jest rzutowana na liczbę całkowitą i używana jako bezpośredni indeks tablicy właściwości.
-- Ponieważ w pliku testowym wpisano kody typów `17` (`UINT16`), `18` (`Timer`) oraz `19` (`Float`), maszyna wirtualna Visual Basic 6 (`MSVBVM60.DLL`) wywołała funkcję `__vbaGenerateBoundsError`, rzucając wyjątek `Run-time error 9: Subscript out of range`.
-- Niewychwycony błąd w bibliotece DLL COM został przekazany do głównego modułu `VisiLogic.exe` jako `Run-time error 440: Automation error`, powodując natychmiastowy crash aplikacji.
+**The Adapter Pattern**:
+In Unitronics Vision controllers, hardware Timers and Floats are handled in Data Tables through standard PLC data representations:
+1. **Timers (`Timer`)**: Stored in **`Long`** columns (`FieldType = 3`, 32-bit signed) as milliseconds or seconds.
+2. **Floats (`Float`)**: Stored in **`DWord`** columns (`FieldType = 4`, raw 32-bit IEEE-754) or **`Integer`** columns (`FieldType = 2`) with decimal scaling (e.g. 0.1 °C).
+3. **Unsigned Integers (`UINT16`)**: Stored in **`DWord`** columns (`FieldType = 4`) to avoid negative signed overflow.
 
-#### Wniosek i Wzorzec Adaptacyjny (Adapter Pattern):
-W sterownikach PLC Unitronics Vision moduł Data Tables nie posiada dedykowanych typów pól dla Timerów ani Floatów. Zmienne te w architekturze PLC Vision przechowuje się w Data Tables zgodnie ze standardem inżynierskim:
-1. **Wartości czasowe (`Timer`)**: przechowuje się w polach typu **`Long`** (`FieldType = 3`, 32-bit ze znakiem) jako liczbę milisekund lub sekund.
-2. **Wartości zmiennoprzecinkowe (`Float`)**: przechowuje się w polach typu **`DWord`** (`FieldType = 4`, 32-bit bez znaku) jako surowy format IEEE-754 lub w polach typu **`Integer`** (`FieldType = 2`, 16-bit) ze stałym skalowaniem dziesiętnym (np. 0.1°C lub 0.01).
-3. **Rejestry bez znaku (`UINT16`)**: przechowuje się bezpiecznie w polach typu **`DWord`** (`FieldType = 4`).
-
-W klasie `DataTableBuilder` oraz `DataColumnDefinition` zaimplementowano bezpieczne metody adapterów (`AddTimer()`, `AddFloat()`, `AddFloatScaled()`, `AddUINT16()`), które automatycznie mapują te zmienne na legalne kody typów `1..6`, eliminując ryzyko błędu `Subscript out of range`.
+The `DataTableBuilder` class provides high-level helper methods (`AddTimer()`, `AddFloat()`, `AddFloatScaled()`, `AddUINT16()`) that map cleanly to valid native types `1..6`.
 
 ---
 
-## 3. Kompendium Problemów, Objawów i Procedur Naprawczych (Troubleshooting)
+## 3. Troubleshooting & Diagnostics Reference
 
-| # | Objaw w VisiLogic / PowerShell | Co się stało (Przyczyna źródłowa) | Skutek awarii | Rozwiązanie problemu |
-|---|-------------------------------|----------------------------------|---------------|----------------------|
-| **1** | Błąd importu lub zignorowanie pliku XML w VisiLogic; w teście COM rozmiar bloku wynosi 1 bajt (`0x00`). | Właściwości kolumn zostały zdefiniowane jako atrybuty (`<Table FieldsCount="10"...>`) zamiast elementów potomnych (`<FieldsCount>10</FieldsCount>`). | VisiLogic nie widzi kolumn; tabela nie zostaje utworzona. | Użyć silnika `DataTableBuilder.ps1`. Formatować wszystkie parametry jako znaczniki potomne węzła `<Column>`. |
-| **2** | Konflikt rozmiaru: `Kolumna X ma nieprawidlowy rozmiar Size=2 (oczekiwano 4)`. | Przypisano `FieldType = 3` (Long) do zmiennej o rozmiarze 2 bajtów (Integer). | Błąd kompilacji struktury tabeli; uszkodzenie alokacji w pamięci SRAM sterownika. | Zastosować prawidłowy kod typu: `FieldType = 2` dla Integer (2B) lub `FieldType = 3` dla Long (4B). |
-| **3** | Błąd PowerShell: `Klasa niezarejestrowana (Class not registered)` przy próbie testu COM. | Skrypt weryfikujący został uruchomiony bezpośrednio w 64-bitowym procesie PowerShell bez wsparcia dla 32-bitowych DLL. | Brak możliwości weryfikacji natywnej. | Używać `verify_data_tables.ps1` (posiada wbudowane auto-przełączanie do `SysWOW64`) lub dodać `-SkipComCheck`. |
-| **4** | Błąd logiczny: `MinValue jest wieksze niz MaxValue`. | Błędnie wprowadzone wartości progowe (np. `MinValue = 100`, `MaxValue = 0`). | Zablokowanie edycji komórek w tabeli na ekranie HMI / edytorze VisiLogic. | Skorygować zakresy min-max w definicji kolumny. Walidator `verify_data_tables.ps1` natychmiast wychwytuje ten błąd. |
-| **5** | Odrzucenie pliku: Błędny identyfikator `COL_ID` kolumny (np. `COL_ID="0"` zamiast `"Column 0"`). | Niezgodność z formatem nazewnictwa identyfikatorów kolumn w VisiLogic. | Silnik `UnPlcDB1` ignoruje kolumny o niestandardowym atrybucie `COL_ID`. | Zawsze stosować konwencję `"Column X"`, gdzie X to 0-based indeks kolumny. Klasa `DataTableBuilder` generuje to automatycznie. |
-| **6** | Obcięcie nazwy kolumny lub brak czytelności w nagłówku tabeli HMI. | Długość nazwy w znaczniku `<Description>` przekroczyła limit 50 znaków. | Obcięcie etykiety w tabeli, utrata przejrzystości parametrów receptury. | Stosować zwięzłe, techniczne nazwy (np. `Temp_Zadana_01C` zamiast wielowyrazowych zdań opisowych). |
-| **7** | Niezgodność `FieldsCount` z liczbą kolumn. | Wartość w znaczniku `<FieldsCount>` nie odpowiada rzeczywistej liczbie znaczników `<Column>`. | Przerwanie importu lub odczytanie śmieciowych danych z niezainicjalizowanych obszarów pamięci. | Wartość `FieldsCount` musi być dokładnie równa liczbie znaczników `<Column>`. Silnik `DataTableBuilder` wylicza to dynamicznie. |
-| **8** | Okno `UnPlcDB1`: `Run-time error '9': Subscript out of range`, a następnie okno `VisiLogic`: `Run-time error '440': Automation error` i natychmiastowy crash programu. | Użyto kodu typu `<FieldType>` większego niż 6 (np. 17, 18, 19). Wewnętrzna tablica typów w `UnPlcDB1.dll` ma sztywny rozmiar 1..6. VB6 rzuca wyjątek przekroczenia zakresu tablicy (`__vbaGenerateBoundsError`). | Natychmiastowe zamknięcie programu VisiLogic z utratą niezapisanych danych. | Stosować wyłącznie dozwolone kody typów `1..6`. Dla zmiennych typu Timer używać adaptera `AddTimer` (mapowany na Long `3`), a dla zmiennych typu Float adaptera `AddFloat` (mapowany na DWord `4`). Walidator `verify_data_tables.ps1` automatycznie blokuje pliki z nielegalnymi kodami typów. |
-| **9** | Kolumny zablokowane do edycji lub niespójne flagi w VisiLogic (`PartOfProject="True"`). | Ustawienie wartości `<PartOfProject>True</PartOfProject>` wymusza na VisiLogic traktowanie tabeli jako stałej części kompilacji projektu (wbudowanej), co przy błędnych powiązaniach może zablokować edycję. | Trudności w modyfikacji parametrów z poziomu VisiLogic. | Ustawiać `<PartOfProject>False</PartOfProject>` (domyślna wartość w `DataTableBuilder.ps1`), co pozwala na pełną swobodę odczytu i zapisu tabeli przez interfejs użytkownika i bloki DTI. |
+| # | Symptom | Root Cause | Consequence | Resolution |
+|:---:|:---|:---|:---|:---|
+| **1** | Import fails silently; COM returns 1 byte (`0x00`). | Table properties defined as XML attributes instead of child tags. | VisiLogic ignores columns; table is not created. | Use `DataTableBuilder.ps1` to emit valid child tags. |
+| **2** | Size mismatch: `Column X has invalid size Size=2 (expected 4)`. | Assigned `FieldType = 3` (Long) to a 2-byte field. | SRAM allocation corrupted. | Ensure `FieldType = 2` for 2-byte Integers, `3` for 4-byte Longs. |
+| **3** | `Class not registered` in PowerShell during COM test. | Running in 64-bit PowerShell; COM DLL is 32-bit. | COM verification cannot execute. | Use `verify_data_tables.ps1` (auto-switches to `SysWOW64`) or `-SkipComCheck`. |
+| **4** | `MinValue is greater than MaxValue`. | Inverted boundary limits (e.g. Min = 100, Max = 0). | HMI keypad and DTI write blocks reject entries. | Correct min/max values; `verify_data_tables.ps1` catches this immediately. |
+| **5** | Column ignored: Invalid `COL_ID` (e.g. `COL_ID="0"`). | Naming convention violation. | `UnPlcDB1` skips non-conforming columns. | Always use `COL_ID="Column X"` where X is the 0-based column index. |
+| **6** | Column name truncated on HMI display. | Description exceeds 50 characters. | Label clipped on operator screen. | Use concise engineering names (e.g. `Target_Temp_01C`). |
+| **7** | Mismatched `FieldsCount`. | Tag count does not match `<Column>` count. | Corrupt memory read during PLC scan. | Let `DataTableBuilder` calculate `FieldsCount` automatically. |
+| **8** | Crash: VB6 Error 9 (`Subscript out of range`) & Error 440. | Used `FieldType > 6` (e.g. 17, 18, 19). | VisiLogic crashes immediately. | Use only types 1..6 or the adapter methods (`AddTimer`, `AddFloat`). |
+| **9** | Table locked from editing (`PartOfProject="True"`). | Table marked as immutable project code. | DTI blocks cannot write dynamic data. | Always keep `PartOfProject = False` and `ReadOnly = False`. |
 
 ---
 
-## 4. Kompletna Procedura: Od Pomysłu do Importu w VisiLogic
+## 4. Step-by-Step Generation and Import Procedure
 
 ```mermaid
 flowchart TD
-    A["1. Zdefiniowanie struktury tabeli (kolumny, typy, zakresy min-max)"] --> B["2. Wybór metody generowania (Builder obiektowy / CLI / Skrypt produkcyjny)"]
-    B --> C["3. Wygenerowanie pliku XML zgodnego z <PLC_DB>"]
-    C --> D["4. Uruchomienie audytora integralności (verify_data_tables.ps1)"]
-    D --> E{"5. Test kompilacji COM (UnPlcDB1.dll) > 1 bajt?"}
-    E -- "NIE (Błędy / Rozmiar = 1B)" --> F["Korekta parametrów kolumn w skrypcie"]
+    A["1. Define Table Schema (Columns, Types, Min/Max Limits)"] --> B["2. Choose Builder Method (OOP API / CLI / CSV Import)"]
+    B --> C["3. Generate XML File conforming to <PLC_DB>"]
+    C --> D["4. Execute Integrity Auditor (verify_data_tables.ps1)"]
+    D --> E{"5. Native COM Compilation (UnPlcDB1.dll) > 1 Byte?"}
+    E -- "NO (Error / Size <= 1B)" --> F["Adjust Column Parameters in Script"]
     F --> C
-    E -- "TAK (Status [SUKCES])" --> G["6. Otwarcie projektu w Unitronics VisiLogic"]
-    G --> H["7. Menu Data Tables -> Import Table Structure (from XML)"]
-    H --> I["8. Gotowa tabela receptur w pamięci PLC, powiązanie z DTI Read/Write"]
+    E -- "YES (Status: SUCCESS)" --> G["6. Open Project in Unitronics VisiLogic"]
+    G --> H["7. Data Tables -> Import Table Structure (from XML)"]
+    H --> I["8. Table Created in PLC SRAM; Bind with DTI Blocks"]
 ```
 
-### Krok 1: Przygotowanie założeń tabeli
-Określ liczbę wierszy (np. 20 kroków receptury) oraz wykaz kolumn. Przypisz odpowiednie typy danych:
-- Parametry temperatury, wilgotności, wydajności i trybów: **Integer (MI)**.
-- Czasy trwania procesów powyżej 9 godzin (w sekundach): **Long (ML)**.
-- Bity zezwoleń i flagi: **Flags (MB)** lub **Integer (0..1)**.
-
-### Krok 2: Generowanie pliku XML
-
-#### Opcja A: Dedykowany generator dla projektu Komora 9 (Zalecana dla tego projektu)
-Wystarczy uruchomić:
-```powershell
-powershell -ExecutionPolicy Bypass -File .\generate_project_data_tables.ps1
-```
-Skrypt wygeneruje produkcyjny plik `wygenerowane_pliki_projektu\data_tables\DT_Recipe_Steps.xml` oraz automatycznie uruchomi pełny audyt.
-
-#### Opcja B: Uniwersalne narzędzie CLI
-Wygenerowanie nowej tabeli na podstawie istniejącego pliku CSV:
-```powershell
-powershell -ExecutionPolicy Bypass -File .\generate_data_tables.ps1 `
-    -OutputPath ".\Moja_Tabela.xml" `
-    -InputCsv "..\..\wygenerowane_pliki_projektu\data_tables\DT_Recipe_Steps.csv" `
-    -TableName "Recipe_Steps" `
-    -RowsCount 20 `
-    -Verify
-```
-
-#### Opcja C: Programistyczne użycie klasy `DataTableBuilder` w PowerShell
+### Step 1: Programmatic Generation via PowerShell OOP API
 ```powershell
 . .\DataTableBuilder.ps1
 
 $builder = [DataTableBuilder]::new()
-$tbl = $builder.NewTable(1, "Recipe_Steps", 20)
-$tbl.AddInteger("Numer_Kroku", 1, 20) | Out-Null
-$tbl.AddLong("Czas_Zadany_s", 0, 86400) | Out-Null
-$tbl.AddInteger("Temp_Zadana_01C", 0, 1200) | Out-Null
-$tbl.AddInteger("Wilg_Zadana_01RH", 0, 1000) | Out-Null
-$tbl.AddInteger("Wentylatory_Obieg", 0, 1) | Out-Null
+$tbl = $builder.NewTable(1, "Recipe_Parameters", 24)
+$tbl.AddInteger("Step_Index", 1, 24) | Out-Null
+$tbl.AddTimer("Duration_Sec", 0, 86400) | Out-Null
+$tbl.AddFloatScaled("Target_Temp_01C", 0, 1200) | Out-Null
+$tbl.AddInteger("Target_Humidity_01RH", 0, 1000) | Out-Null
+$tbl.AddFlags("Recirculation_Fan", 0, 1) | Out-Null
 
-$builder.SaveXml(".\Moja_Tabela.xml")
+$builder.SaveXml(".\My_Data_Table.xml")
 ```
 
-### Krok 3: Weryfikacja integralności pliku
-Przed przystąpieniem do importu w VisiLogic zawsze uruchom audytor:
+### Step 2: Verification with the Automated Auditor
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\verify_data_tables.ps1 -XmlPath ".\wygenerowane_pliki_projektu\data_tables\DT_Recipe_Steps.xml"
+powershell -ExecutionPolicy Bypass -File .\verify_data_tables.ps1 -XmlPath ".\My_Data_Table.xml"
 ```
 
-*Oczekiwany raport sukcesu:*
+*Expected Verification Output:*
 ```text
 ============================================================
- AUDYT INTEGRALNOSCI DATA TABLES XML DLA VISILOGIC
- Plik: ...\wygenerowane_pliki_projektu\data_tables\DT_Recipe_Steps.xml
+ VISILOGIC DATA TABLES XML INTEGRITY AUDIT
+ File: ...\My_Data_Table.xml
 ============================================================
-  [OK] Skladnia XML poprawna, dokument zaimportowany pomyslnie
-  [OK] Wezel glowny to <PLC_DB>
-  [OK] Znaleziono tabel w pliku XML: 1
+  [OK] Valid XML syntax; document loaded successfully
+  [OK] Root node is <PLC_DB>
+  [OK] Tables found in XML: 1
 
---- Sprawdzanie tabeli #1 (TABLE_ID: '1') ---
+--- Validating Table #1 (TABLE_ID: '1') ---
   [OK] TABLE_ID = 1
-  [OK] Nazwa tabeli: 'Recipe_Steps'
-  [OK] RowsCount = 20
-  [OK] FieldsCount = 10 (zgodne z liczba znacznikow <Column>)
-  [OK] Wszystkie kolumny tabeli #1 zweryfikowane pomyslnie
+  [OK] Table Description: 'Recipe_Parameters'
+  [OK] RowsCount = 24
+  [OK] FieldsCount = 5 (matches <Column> element count)
+  [OK] All columns in Table #1 passed structural validation
 
---- Weryfikacja przez natywny silnik COM VisiLogic (UnPlcDB1.dll) ---
-  [OK] Silnik COM VisiLogic w 100% zaakceptowal strukture XML! Rozmiar DesignBlock: 280 bajtow
+--- Native VisiLogic COM Engine Verification (UnPlcDB1.dll) ---
+  [OK] COM engine accepted XML structure! DesignBlock size: 264 bytes
 
 ============================================================
- [SUKCES] Plik Data Table XML jest w 100% poprawny i gotowy do importu w VisiLogic!
+ [SUCCESS] Data Table XML is 100% valid and ready for VisiLogic import!
 ```
 
-### Krok 4: Procedura importu w programie VisiLogic (Krok po Kroku)
-
-1. Uruchom program **Unitronics VisiLogic** i otwórz projekt sterownika (`.vlp`).
-2. W drzewie projektu po lewej stronie (**Project Navigation Tree**) rozwiń gałąź **Data Tables**.
-3. Kliknij prawym przyciskiem myszy na węźle **Data Tables** (lub w głównym oknie modułu Data Tables) i wybierz opcję:
-   **Import Table Structure (from XML)**.
-4. W oknie dialogowym wyboru pliku wskaż przygotowany i zweryfikowany plik:
-   `wygenerowane_pliki_projektu\data_tables\DT_Recipe_Steps.xml`.
-5. Potwierdź import. VisiLogic utworzy tabelę o identyfikatorze `1`, nazwie `Recipe_Steps`, 20 wierszach oraz komplecie 10 precyzyjnie skonfigurowanych kolumn.
-6. Otwórz tabelę w edytorze Data Tables, aby upewnić się, że nagłówki i limity min/max są widoczne.
-7. Aby wgrać wartości domyślne kroków, skorzystaj z importu wartości z pliku CSV (`DT_Recipe_Steps.csv`) za pomocą standardowej funkcji **Import Data from CSV / Excel**.
-8. W logice drabinkowej (drabinka `03_RECEPTURY.vlx`) operacje odczytu i zapisu wierszy realizowane są za pomocą bloków funkcyjnych **Read DTI Row** oraz **Write DTI Row** powiązanych z buforem rejestrów `MI 200 .. MI 208` oraz `ML 200`.
+### Step 3: Importing into VisiLogic
+1. Launch **Unitronics VisiLogic** and open your PLC project (`.vlp`).
+2. In the left navigation pane (**Project Navigation Tree**), expand **Data Tables**.
+3. Right-click on **Data Tables** and select **Import Table Structure (from XML)**.
+4. Select the verified `.xml` file.
+5. VisiLogic creates the table with all column headers, field types, and min/max limits configured.
 
 ---
 
-## 5. Instrukcja Dedykowana dla Agentów AI (Prompting & Automation Guide)
+## 5. Guidelines for AI Agents (Prompting & Automation Rules)
 
-Jeśli jesteś autonomicznym agentem AI realizującym zadania w tym projekcie lub integrującym nowe tabele PLC:
-1. **Nigdy nie twórz pliku XML za pomocą prostego łączenia stringów w pętli.** Zawsze używaj klasy `[DataTableBuilder]::new()` z pliku `DataTableBuilder.ps1`. Gwarantuje to właściwy układ węzłów potomnych, poprawny duplikat znacznika `<FormatView>` oraz właściwe typy danych.
-2. **Nigdy nie używaj atrybutów XML dla właściwości kolumn.** Silnik VisiLogic wymaga elementów potomnych (`<FieldType>`, `<Size>`, `<MinValue>` itd.), a nie atrybutów w znaczniku `<Column>`.
-3. **Pamiętaj o numeracji 1-based:** `TABLE_ID` oraz znacznik `<Key>` w kolumnach są numerowane od `1` (1, 2, 3...), natomiast `COL_ID` jest numerowany od zera (`Column 0`, `Column 1`...).
-4. **Ściśle przestrzegaj 6 natywnych typów kolumn:** Silnik `UnPlcDB1.dll` dopuszcza WYŁĄCZNIE wartości `FieldType` ze zbioru `{1, 2, 3, 4, 5, 6}`. Wpisanie jakiejkolwiek innej wartości (np. 17, 18, 19) wywołuje VB6 `Run-time error '9': Subscript out of range` oraz `Run-time error '440': Automation error` i natychmiastowo crashuje VisiLogic!
-5. **Dla zmiennych typu Timer i Float zawsze stosuj metody adaptacyjne:**
-   - Czas / Timer $\to$ używaj `$tbl.AddTimer(...)` (mapowane na Long `3`, 32-bit ze znakiem).
-   - Liczby zmiennoprzecinkowe / Float $\to$ używaj `$tbl.AddFloat(...)` (mapowane na DWord `4`, 32-bit surowy IEEE-754) lub `$tbl.AddFloatScaled(...)` (mapowane na Integer `2` ze stałym mnożnikiem, np. 0.1°C).
-   - Rejestry 16-bit bez znaku / UINT16 $\to$ używaj `$tbl.AddUINT16(...)` (mapowane na DWord `4`).
-6. **Zawsze zachowuj `PartOfProject = False` i `ReadOnly = False`** dla swobodnej edycji i zapisu przez DTI.
-7. **Przed powiadomieniem użytkownika zawsze uruchom `verify_data_tables.ps1`:** Tylko status `[SUKCES]` z wynikiem natywnej kompilacji COM (`DesignBlock > 1 bajt`) potwierdza poprawność wykonanego zadania.
+When developing or integrating Data Tables via autonomous agents:
+1. **Never generate XML using raw string concatenation.** Always instantiate `[DataTableBuilder]::new()`. This prevents tag order issues and missing `<FormatView>` duplicates.
+2. **Never use XML attributes for column properties.** Child tags (`<FieldType>`, `<Size>`, `<MinValue>`) are mandatory.
+3. **Follow 1-based and 0-based numbering rules:**
+   - `TABLE_ID` and the `<Key>` tag inside `<Column>` are 1-based (`1, 2, 3...`).
+   - `COL_ID` attributes are 0-based (`"Column 0"`, `"Column 1"`...).
+4. **Enforce native types 1 through 6:** Never set `FieldType` above 6. Use the adapter methods (`AddTimer`, `AddFloat`, `AddFloatScaled`, `AddUINT16`).
+5. **Always execute `verify_data_tables.ps1` before reporting completion.** A positive test requires `DesignBlock > 1 byte`.
 
 ---
 
-## 6. Specyfikacja Techniczna i Matryca Typów Kolumn VisiLogic
+## 6. Technical Specifications & Column Types Matrix
 
-### 6.1. Natywne Typy Kolumn Modułu Data Tables (`UnPlcDB1.dll`)
+### 6.1. Native Column Types (`UnPlcDB1.dll`)
 
-| Typ danych VisiLogic | Kod `FieldType` | Rozmiar `Size` | Dozwolony zakres `MinValue` .. `MaxValue` | Wartość `StringLength` | Format `FormatView` | Odpowiadający rejestr PLC | Typowe zastosowanie |
+| Data Type | `FieldType` | `Size` | Allowed Limits (`MinValue` .. `MaxValue`) | `StringLength` | `FormatView` | PLC Operand | Typical Application |
 |:---|:---:|:---:|:---:|:---:|:---:|:---:|:---|
-| **Flags** | **1** | 1 B | `0` .. `1` | 10 | 1 | `MB` (Memory Bit) | Flagi logiczne, zezwolenia na pracę, bity stanów |
-| **Integer** | **2** | 2 B | `-32768` .. `32767` | 10 | 1 | `MI` (Memory Integer) | Pomiary temperatur (0.1°C), wilgotności (%RH), nastawy |
-| **Long** | **3** | 4 B | `-2147483648` .. `2147483647` | 0 | 1 | `ML` (Memory Long) | Czas trwania kroku suszenia w sekundach (do 24h/72h) |
-| **DWord** | **4** | 4 B | `0` .. `4294967295` | 10 | 1 | `MDW` (Memory DWord) | Maski bitowe alarmów, liczniki impulsów dużej częstotliwości |
-| **Byte** | **5** | 1 B | `0` .. `255` | 10 | 1 | Brak (rejestr wewn.) | Kody błędów, krótkie indeksy maszyn stanów |
-| **String** | **6** | Zmienny (np. 16 B) | `-32768` .. `32767` | Równy `Size` (np. 16) | 1 | Bufor `String` | Alfanumeryczne nazwy receptur, komunikaty operatora |
+| **Flags** | **1** | 1 B | `0` .. `1` | 10 | 1 | `MB` (Memory Bit) | Logic flags, step interlocks, enable bits |
+| **Integer** | **2** | 2 B | `-32768` .. `32767` | 10 | 1 | `MI` (Memory Integer) | Analog measurements (0.1 °C, %RH), setpoints |
+| **Long** | **3** | 4 B | `-2147483648` .. `2147483647` | 0 | 1 | `ML` (Memory Long) | Extended step timers, high-capacity batch counters |
+| **DWord** | **4** | 4 B | `0` .. `4294967295` | 10 | 1 | `MDW` (Memory DWord) | Alarm bitmasks, high-speed pulse registers |
+| **Byte** | **5** | 1 B | `0` .. `255` | 10 | 1 | None (Internal) | State machine step codes, error classifications |
+| **String** | **6** | Variable (e.g. 16 B) | `-32768` .. `32767` | Equal to `Size` (e.g. 16) | 1 | String Buffer | Product batch codes, alphanumeric recipe tags |
 
-### 6.2. Wzorzec Adaptacyjny dla Pozostałych Typów Danych PLC
+### 6.2. Adapter Mappings for Extended PLC Types
 
-Moduł Data Tables w sterownikach Vision nie udostępnia odrębnych typów pól dla obiektów sprzętowych Timerów ani rejestrów zmiennoprzecinkowych. W praktyce inżynierskiej Unitronics dane te mapuje się w tabelach w następujący sposób:
-
-| Logiczny typ danych | Zalecana metoda w `DataTableBuilder` | Mapowany typ natywny | Kod `FieldType` | Rozmiar `Size` | Jednostka / Interpretacja w PLC |
+| Logical Data Type | Recommended `DataTableBuilder` Method | Underlying Native Type | `FieldType` | `Size` | Units / PLC Interpretation |
 |:---|:---|:---|:---:|:---:|:---|
-| **Timer (T)** | `$tbl.AddTimer("Nazwa", min, max)` | **Long** | **3** | 4 B | Milisekundy lub sekundy; odczyt/zapis bloku DTI do rejestru `ML`, a następnie konwersja `ML to Timer` w ladderze |
-| **Float (MF) - IEEE-754** | `$tbl.AddFloat("Nazwa", min, max)` | **DWord** | **4** | 4 B | 32-bitowy binarny float; w ladderze kopiowany bezpośrednio `Copy MDW to MF` |
-| **Float (MF) - Skalowany** | `$tbl.AddFloatScaled("Nazwa", min, max)` | **Integer** | **2** | 2 B | Stałoprzecinkowy (np. 21.5°C przechowywane jako 215 w `MI`); standard w automatyce PLC |
-| **UINT16 (XI)** | `$tbl.AddUINT16("Nazwa", min, max)` | **DWord** | **4** | 4 B | Rejestr 16-bit bez znaku umieszczony w 32-bitowym polu `MDW`, zapobiega przekroczeniu zakresu `MI` |
-
----
-*Pakiet opracowany w ramach projektu automatyzacji komory suszarniczej nr 9 dla sterownika Unitronics Vision V350-35-RA22.*
+| **Timer (T)** | `$tbl.AddTimer("Name", min, max)` | **Long** | **3** | 4 B | Milliseconds or seconds; DTI Read/Write binds to `ML`, converted with ladder `ML to Timer` |
+| **Float (MF) - IEEE-754** | `$tbl.AddFloat("Name", min, max)` | **DWord** | **4** | 4 B | 32-bit binary float; converted with ladder `Copy MDW to MF` |
+| **Float (MF) - Scaled** | `$tbl.AddFloatScaled("Name", min, max)` | **Integer** | **2** | 2 B | Fixed-point integer (e.g., 21.5 °C represented as 215 in `MI`) |
+| **UINT16 (XI)** | `$tbl.AddUINT16("Name", min, max)` | **DWord** | **4** | 4 B | Unsigned 16-bit register inside 32-bit `MDW` field |

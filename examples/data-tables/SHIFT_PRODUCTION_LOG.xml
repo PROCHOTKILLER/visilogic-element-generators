@@ -1,0 +1,127 @@
+<PLC_DB>
+  <Table TABLE_ID="1">
+    <FieldsCount>8</FieldsCount>
+    <RowsCount>24</RowsCount>
+    <Description>Production_Shifts</Description>
+    <Column COL_ID="Column 0">
+      <FieldType>2</FieldType>
+      <Size>2</Size>
+      <ElementsCount>1</ElementsCount>
+      <Key>1</Key>
+      <StringLength>10</StringLength>
+      <ReadOnly>False</ReadOnly>
+      <PartOfProject>False</PartOfProject>
+      <FormatView>1</FormatView>
+      <MinValue>1</MinValue>
+      <MaxValue>24</MaxValue>
+      <FormatView>1</FormatView>
+      <Description>Shift_ID</Description>
+      <ElementsDescriptions></ElementsDescriptions>
+    </Column>
+    <Column COL_ID="Column 1">
+      <FieldType>6</FieldType>
+      <Size>10</Size>
+      <ElementsCount>1</ElementsCount>
+      <Key>2</Key>
+      <StringLength>10</StringLength>
+      <ReadOnly>False</ReadOnly>
+      <PartOfProject>False</PartOfProject>
+      <FormatView>1</FormatView>
+      <MinValue>-32768</MinValue>
+      <MaxValue>32767</MaxValue>
+      <FormatView>1</FormatView>
+      <Description>Shift_Date</Description>
+      <ElementsDescriptions></ElementsDescriptions>
+    </Column>
+    <Column COL_ID="Column 2">
+      <FieldType>6</FieldType>
+      <Size>16</Size>
+      <ElementsCount>1</ElementsCount>
+      <Key>3</Key>
+      <StringLength>16</StringLength>
+      <ReadOnly>False</ReadOnly>
+      <PartOfProject>False</PartOfProject>
+      <FormatView>1</FormatView>
+      <MinValue>-32768</MinValue>
+      <MaxValue>32767</MaxValue>
+      <FormatView>1</FormatView>
+      <Description>Shift_Leader</Description>
+      <ElementsDescriptions></ElementsDescriptions>
+    </Column>
+    <Column COL_ID="Column 3">
+      <FieldType>3</FieldType>
+      <Size>4</Size>
+      <ElementsCount>1</ElementsCount>
+      <Key>4</Key>
+      <StringLength>0</StringLength>
+      <ReadOnly>False</ReadOnly>
+      <PartOfProject>False</PartOfProject>
+      <FormatView>1</FormatView>
+      <MinValue>0</MinValue>
+      <MaxValue>1000000</MaxValue>
+      <FormatView>1</FormatView>
+      <Description>Units_Produced</Description>
+      <ElementsDescriptions></ElementsDescriptions>
+    </Column>
+    <Column COL_ID="Column 4">
+      <FieldType>3</FieldType>
+      <Size>4</Size>
+      <ElementsCount>1</ElementsCount>
+      <Key>5</Key>
+      <StringLength>0</StringLength>
+      <ReadOnly>False</ReadOnly>
+      <PartOfProject>False</PartOfProject>
+      <FormatView>1</FormatView>
+      <MinValue>0</MinValue>
+      <MaxValue>1000000</MaxValue>
+      <FormatView>1</FormatView>
+      <Description>Units_Rejected</Description>
+      <ElementsDescriptions></ElementsDescriptions>
+    </Column>
+    <Column COL_ID="Column 5">
+      <FieldType>3</FieldType>
+      <Size>4</Size>
+      <ElementsCount>1</ElementsCount>
+      <Key>6</Key>
+      <StringLength>0</StringLength>
+      <ReadOnly>False</ReadOnly>
+      <PartOfProject>False</PartOfProject>
+      <FormatView>1</FormatView>
+      <MinValue>0</MinValue>
+      <MaxValue>86400</MaxValue>
+      <FormatView>1</FormatView>
+      <Description>Uptime_Seconds</Description>
+      <ElementsDescriptions></ElementsDescriptions>
+    </Column>
+    <Column COL_ID="Column 6">
+      <FieldType>3</FieldType>
+      <Size>4</Size>
+      <ElementsCount>1</ElementsCount>
+      <Key>7</Key>
+      <StringLength>0</StringLength>
+      <ReadOnly>False</ReadOnly>
+      <PartOfProject>False</PartOfProject>
+      <FormatView>1</FormatView>
+      <MinValue>0</MinValue>
+      <MaxValue>100000</MaxValue>
+      <FormatView>1</FormatView>
+      <Description>Energy_kWh</Description>
+      <ElementsDescriptions></ElementsDescriptions>
+    </Column>
+    <Column COL_ID="Column 7">
+      <FieldType>2</FieldType>
+      <Size>2</Size>
+      <ElementsCount>1</ElementsCount>
+      <Key>8</Key>
+      <StringLength>10</StringLength>
+      <ReadOnly>False</ReadOnly>
+      <PartOfProject>False</PartOfProject>
+      <FormatView>1</FormatView>
+      <MinValue>0</MinValue>
+      <MaxValue>100</MaxValue>
+      <FormatView>1</FormatView>
+      <Description>Efficiency_Pct</Description>
+      <ElementsDescriptions></ElementsDescriptions>
+    </Column>
+  </Table>
+</PLC_DB>

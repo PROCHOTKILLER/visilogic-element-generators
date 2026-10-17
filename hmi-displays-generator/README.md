@@ -1,88 +1,87 @@
-# Generator Ekranów HMI VisiLogic (.VLD) - Moduł All-In-One (AIO)
-## Standard ANSI/ISA-101.01 | Projekt: Czysto Elektryczna Komora Suszarnicza nr 9
+# VisiLogic HMI Displays Generator (.VLD) - All-In-One (AIO) Engine
+## ANSI/ISA-101.01 Standard | High-Performance HMI for Unitronics Vision Series PLCs (V130, V350, V430, V570, V1040, V1210)
 
-Profesjonalny silnik programistyczny do automatycznego projektowania, budowania i eksportu kompletnych ekranów operatorskich HMI w formacie `.vld` (VisiLogic Displays) dla sterowników PLC serii **Unitronics Vision** (ze szczególnym uwzględnieniem modelu **Vision V350-35-RA22** o rozdzielczości 320x240 pikseli).
-
----
-
-## Spis treści
-1. [Wprowadzenie i architektura rozwiązania](#1-wprowadzenie-i-architektura-rozwiązania)
-2. [Droga inżynierii wstecznej: Od analizy pliku do pełnego generatora](#2-droga-inżynierii-wstecznej-od-analizy-pliku-do-pełnego-generatora)
-3. [Struktura wewnętrzna formatu .VLD i bazy Jet 4.0](#3-struktura-wewnętrzna-formatu-vld-i-bazy-jet-40)
-4. [Katalog kontrolek HMI i ich właściwości binarne](#4-katalog-kontrolek-hmi-i-ich-właściwości-binarne)
-5. [Składniki modułu narzędziowego](#5-składniki-modułu-narzędziowego)
-6. [Instrukcja krok po kroku: Procedura generowania i importu](#6-instrukcja-krok-po-kroku-procedura-generowania-i-importu)
-7. [Architektura 8 ekranów HMI Komory Suszarniczej nr 9](#7-architektura-8-ekranów-hmi-komory-suszarniczej-nr-9)
-8. [Audytor integralności bazy (verify_displays.ps1)](#8-audytor-integralności-bazy-verify_displaysps1)
-9. [Baza wiedzy i rozwiązywanie problemów (Troubleshooting)](#9-baza-wiedzy-i-rozwiązywanie-problemów-troubleshooting)
+A professional automation engine designed to programmatically generate, assemble, and export operator HMI display packages in native `.vld` (VisiLogic Displays) format for **Unitronics Vision Series** controllers (specifically optimized for QVGA 320x240 color touchscreen models such as the **V350-35-RA22**, and modular series).
 
 ---
 
-## 1. Wprowadzenie i architektura rozwiązania
-
-W środowisku **Unitronics VisiLogic** ekrany operatorskie (HMI Displays) mogą być eksportowane i importowane za pomocą plików o rozszerzeniu `.vld`. Format ten pozwala na przenoszenie pojedynczych ekranów lub całych bibliotek ekranów pomiędzy projektami bez konieczności ręcznego rysowania każdego elementu.
-
-Niniejszy generator rozwiązuje problem żmudnego, ręcznego układania dziesiątek kontrolek w edytorze HMI VisiLogic. Umożliwia inżynierom automatykom oraz agentom sztucznej inteligencji:
-- Programistyczne tworzenie układu paneli, etykiet, przycisków, zmiennych numerycznych z edycją dotykową (Keypad) oraz wskaźników słupkowych (Bargraph), zegarowych (Gauge) i zbiornikowych (Tank).
-- Precyzyjne pozycjonowanie piksel po pikselu w siatce 320x240 pikseli.
-- Pełną zgodność ze standardem **ANSI/ISA-101.01-2015 (High Performance HMI)** – stonowane szarości, ciemne ramki, kolory zarezerwowane wyłącznie dla wskaźników statusu (zielony=praca, żółty=ostrzeżenie, czerwony=awaria).
-- Implementację **3 poziomów dostępu**: Operator (domyślny, bez hasła), Technolog (kod PIN), Serwis (kod PIN).
-- Automatyczne wiązanie kontrolek ze zmiennymi procesowymi PLC (**MB**, **MI**, **DW**, **ML**).
-- Weryfikację integralności bazy danych i geometrii ekranów przed próbą importu do oprogramowania VisiLogic.
+## Table of Contents
+1. [Introduction and Architecture](#1-introduction-and-architecture)
+2. [Reverse Engineering Chronicle: Format Discovery & Mechanics](#2-reverse-engineering-chronicle-format-discovery--mechanics)
+3. [Internal Structure of the .VLD Container & Jet 4.0 Database](#3-internal-structure-of-the-vld-container--jet-40-database)
+4. [HMI Controls Catalog & Binary Properties](#4-hmi-controls-catalog--binary-properties)
+5. [Toolkit Components](#5-toolkit-components)
+6. [Step-by-Step Generation and Import Workflow](#6-step-by-step-generation-and-import-workflow)
+7. [Industrial Multi-Screen HMI Architecture](#7-industrial-multi-screen-hmi-architecture)
+8. [Database Integrity Auditor (verify_displays.ps1)](#8-database-integrity-auditor-verify_displaysps1)
+9. [Troubleshooting & Diagnostics Reference](#9-troubleshooting--diagnostics-reference)
 
 ---
 
-## 2. Droga inżynierii wstecznej: Od analizy pliku do pełnego generatora
+## 1. Introduction and Architecture
 
-### Krok 1: Identyfikacja formatu kontenera `.vld`
-Analizę rozpoczęto od zbadania pliku wzorcowego `dokumentacja/Visilogic_projekt_HMI_displays.vld`, wyeksportowanego z działającego projektu. Pierwsze 4 bajty nagłówka:
+In the **Unitronics VisiLogic** engineering environment, graphical operator screens (HMI Displays) can be imported and exported via `.vld` container files. This format facilitates moving individual screens or entire multi-display packages between projects without manually drawing visual elements in the GUI.
+
+This generator eliminates tedious, pixel-by-pixel graphic placement in VisiLogic's editor. It empowers control engineers and automated AI workflows to:
+- Programmatically construct displays, group containers, buttons, numeric entry variables with virtual keypad overlays (`Keypad=1`), and dynamic meters (Bargraphs, Dial Gauges, and Tank indicators).
+- Enforce strict pixel positioning within the discrete 320x240 display coordinate space.
+- Comply fully with the **ANSI/ISA-101.01-2015 (High Performance HMI)** standard (neutral grayscale backgrounds, muted operational colors, with high-contrast color strictly reserved for alarm status).
+- Implement multi-tier role-based access security (Operator, Technician, Service Engineer).
+- Automatically link graphic elements to PLC process variables (**MB**, **MI**, **DW**, **ML**).
+- Perform pre-import relational integrity and geometry validation.
+
+---
+
+## 2. Reverse Engineering Chronicle: Format Discovery & Mechanics
+
+### Step 1: Identifying the `.vld` Container Format
+Analysis of reference `.vld` files exported from active VisiLogic installations revealed the standard PKWare ZIP signature at offset 0x00:
 ```text
-50 4B 03 04 (PK..) -> Sygnatura standardowego archiwum ZIP PKWare
+50 4B 03 04 (PK..) -> Standard PKWare ZIP archive
 ```
-Po rozpakowaniu archiwum ujawniono jeden plik o nazwie:
+Extracting the archive revealed a single embedded file:
 ```text
-HMIBufferColorPages.udb (rozmiar: ~614 KB)
+HMIBufferColorPages.udb (uncompressed size: ~614 KB)
 ```
 
-### Krok 2: Analiza bazy danych `HMIBufferColorPages.udb`
-Sprawdzono sygnaturę pliku `.udb` pod kątem formatu bazy danych:
-- Sygnatura na offsecie 0x00 to nagłówek **Standard Jet DB** (`Microsoft Access Jet 4.0 / ACE OLEDB`).
-- Podczas gdy pliki projektów `.vlp` oraz podprogramów `.vlx` wymagają hasła bazy danych `UniOpenSesame;`, plik `HMIBufferColorPages.udb` okazał się **całkowicie otwarty (bez hasła)**, co umożliwiło bezpośrednie odpytywanie i zapis przez provider `Microsoft.ACE.OLEDB.12.0` oraz `Microsoft.Jet.OLEDB.4.0`.
+### Step 2: Dissecting `HMIBufferColorPages.udb`
+Inspecting the `.udb` binary header:
+- The byte signature at offset 0x00 matches a **Standard Jet DB** (`Microsoft Access Jet 4.0 / ACE OLEDB`).
+- Unlike `.vlp` projects and `.vlx` subroutines (which are protected with the system password `UniOpenSesame`), `HMIBufferColorPages.udb` has **no database password**, permitting direct querying and record creation via `Microsoft.Jet.OLEDB.4.0` or `Microsoft.ACE.OLEDB.12.0`.
 
-### Krok 3: Analiza relacji i tabel bazy
-Wykonano skrypt diagnostyczny mapujący schemat tabel i powiązania:
-1. `Pages` oraz `Pages_all`: Przechowują metadane stron (ID, opis, kolor tła `ColorBack=74`, flagę `ModuleID`: 1 dla Start-Up Display, 2 dla zwykłych stron). Obie tabele muszą zawierać dokładnie ten sam zestaw rekordów.
-2. `DisplayNote`: Zawiera powiązanie `PageID` z notatką techniczną ekranu. VisiLogic bezwzględnie wymaga obecności rekordu dla każdego `PageID` (bufor 510 bajtów). Brak wpisu powoduje błąd dostępu do pamięci i zawieszenie programu przy otwarciu widoku właściwości.
-3. `HMI_Elements`: Tabela główna elementów graficznych i zmiennych. Zawiera współrzędne geometryczne (`Xs`, `Ys`, `Dx`, `Dy`), kolory (`ColorFore`, `ColorBack`), kody typów (`Type`, `VarType`), teksty etykiet oraz właściwości OLE w kolumnie binarnej `[Binary]`.
-4. `HMI_Operands`: Tabela powiązań kontrolek ze zmiennymi PLC. Wiąże `ElementID` z typem operandu (`OprndType`: MB=1, MI=3 itd.) oraz adresem (`OprndAddr`) i rolą (`OprndPurpose`: 1 - odczyt wartości, 2 - bit dotykowy).
-5. Tabele systemowe: `HW_Elements`, `tblFonts`, `ProjectImages`, `TblOperandTypes`.
+### Step 3: Schema and Relational Dependencies
+1. `Pages` and `Pages_all`: Store display metadata (`ID`, `Description`, background color `ColorBack=74`, and `ModuleID`: 1 for Start-Up Display, 2 for standard pages). Both tables must maintain an identical set of records.
+2. `DisplayNote`: Stores page documentation buffers linked by `PageID`. VisiLogic strictly requires a matching record for every defined `PageID` with a 510-byte zeroed binary buffer. Omitting this record causes memory access violations when opening display properties.
+3. `HMI_Elements`: Core graphic controls table. Defines coordinate geometry (`Xs`, `Ys`, `Dx`, `Dy`), palette color codes (`ColorFore`, `ColorBack`), control classification codes (`Type`, `VarType`), label text, and OLE Property Bag bytes in `[Binary]`.
+4. `HMI_Operands`: Binds controls to PLC memory registers. Links `ElementID` with memory type (`OprndType`: MB=1, MI=3), physical address (`OprndAddr`), and operand purpose (`OprndPurpose`: 1 for process read, 2 for touch bit).
+5. Auxiliary tables: `HW_Elements`, `tblFonts`, `ProjectImages`, `TblOperandTypes`.
 
-### Krok 4: Dekodowanie obiektów `[Binary]` (Property Bag)
-Analiza heksadecymalna ujawniła, że kontrolki zmiennych procesowych (numeryczne, wskaźniki słupkowe, zegary) przechowują konfigurację formatowania w serializowanym formacie OLE Property Bag:
-- **Numeric Variable (VarType = 8):** bufor 1740 bajtów precyzujący liczbę cyfr całkowitych i ułamkowych, flagi znaku oraz parametry wirtualnej klawiatury dotykowej.
-- **Bargraph (VarType = 24):** bufor 624 bajtów definiujący orientację słupka, kolory progów i podziałkę skali.
-- **Tank (VarType = 25):** bufor 512 bajtów modelujący zbiornik cieczy.
-- **Gauge (VarType = 21):** bufor 1464 bajtów modelujący analogowy zegar pomiarowy.
+### Step 4: Decoding `[Binary]` Property Bags
+Hexadecimal inspection revealed that complex process controls (numeric variables, bargraphs, gauges) store their format configuration in serialized OLE Property Bags:
+- **Numeric Variable (VarType = 8):** 1,740-byte buffer specifying integer/fractional digit count, leading zero suppression, sign display, and virtual touchscreen keypad properties.
+- **Bargraph (VarType = 24):** 624-byte buffer defining orientation, high/low threshold colors, and tick graduation.
+- **Tank (VarType = 25):** 512-byte buffer rendering a volumetric liquid tank container.
+- **Gauge (VarType = 21):** 1,464-byte buffer modeling a circular dial meter with pointer sweep.
 
-Wyodrębniono czyste, gotowe szablony binarne do katalogu `templates/`, co pozwoliło na deterministyczne generowanie kontrolek bez ryzyka korupcji formatu binarnego.
+Verified binary templates for each control type are preserved in the `templates/` directory, ensuring error-free generation.
 
 ---
 
-## 3. Struktura wewnętrzna formatu .VLD i bazy Jet 4.0
+## 3. Internal Structure of the .VLD Container & Jet 4.0 Database
 
-```
-KOMORA9_HMI_ISA101.vld (Archiwum ZIP)
- └── HMIBufferColorPages.udb (Baza Access Jet 4.0 / ACE)
-      ├── Pages & Pages_all (Definicje stron i ekranów)
-      ├── DisplayNote (Wymagany bufor metadanych strony)
-      ├── HMI_Elements (Kontrolki: etykiety, przyciski, ramki, zmienne)
-      ├── HMI_Operands (Mapowanie na rejestry i bity PLC)
-      ├── tblFonts (Tabele wbudowanych czcionek Unitronics)
-      ├── TblOperandTypes (Słownik typów operandów)
-      └── HW_Elements (Konfiguracja sprzętowa kontrolera)
+```text
+Application_Displays.vld (ZIP Archive)
+ └── HMIBufferColorPages.udb (Access Jet 4.0 / ACE Database)
+      ├── Pages & Pages_all (Display headers and startup flag)
+      ├── DisplayNote (Mandatory 510-byte zeroed metadata buffer)
+      ├── HMI_Elements (Visual controls, labels, buttons, panels, variables)
+      ├── HMI_Operands (Linkage to PLC memory addresses)
+      ├── tblFonts (Embedded Unitronics typography definitions)
+      ├── TblOperandTypes (Operand type lookup table)
+      └── HW_Elements (Hardware bezel configuration)
 ```
 
-### Relacje między tabelami:
+### Relational Entity Model:
 ```mermaid
 erDiagram
     Pages ||--|| Pages_all : "Mirror (Id)"
@@ -93,179 +92,151 @@ erDiagram
 
 ---
 
-## 4. Katalog kontrolek HMI i ich właściwości binarne
+## 4. HMI Controls Catalog & Binary Properties
 
-| Typ kontrolki | `Type` | `VarType` | `Binary` (Property Bag) | `FieldRole` w HMI_Operands | Opis i zastosowanie |
-|---|:---:|:---:|:---:|:---:|---|
-| **Etykieta (Label)** | `4` | `0` | `NULL` | - | Statyczny tekst informacyjny, nagłówki, opisy |
-| **Przycisk (Button)** | `11` | `0` | `NULL` | `2` (Touch MB) | Przycisk dotykowy ustawiający bit pamięci MB |
-| **Prostokąt (Panel)** | `1` | `0` | `NULL` | - | Tło sekcji, ramka grupująca kontrolki |
-| **Linia (Line)** | `2` | `0` | `NULL` | - | Pozioma lub pionowa linia podziału |
-| **Zmienna numeryczna** | `8` | `8` | 1740 B (`numeric_propertybag.bin`) | `1` (Value MI/DW) | Wyświetlanie wartości analogowych oraz edycja z klawiatury dotykowej (`Keypad=1`) |
-| **Wskaźnik słupkowy (Bargraph)** | `8` | `24` | 624 B (`bargraph_propertybag.bin`) | `1` (Value MI) | Dynamiczny słupek wysterowania (temperatura, wentylatory) |
-| **Zbiornik (Tank)** | `8` | `25` | 512 B (`tank_propertybag.bin`) | `1` (Value MI) | Wizualizacja poziomu medium |
-| **Wskaźnik zegarowy (Gauge)** | `8` | `21` | 1464 B (`gauge_propertybag.bin`) | `1` (Value MI) | Okrągły miernik tarczowy ze wskazówką |
+| Control Type | `Type` | `VarType` | `Binary` (Property Bag) | `OprndPurpose` in HMI_Operands | Purpose & Application |
+|:---|:---:|:---:|:---:|:---:|:---|
+| **Label** | `4` | `0` | `NULL` | - | Static text labels, section titles, engineering units |
+| **Button** | `11` | `0` | `NULL` | `2` (Touch MB) | Interactive touch button toggling/pulsing memory bit `MB` |
+| **Rectangle (Panel)** | `1` | `0` | `NULL` | - | Grouping container or background panel |
+| **Line** | `2` | `0` | `NULL` | - | Visual dividing rule |
+| **Numeric Variable** | `8` | `8` | 1740 B (`numeric_propertybag.bin`) | `1` (Value MI/DW) | Analog value display with optional touchscreen keypad (`Keypad=1`) |
+| **Bargraph** | `8` | `24` | 624 B (`bargraph_propertybag.bin`) | `1` (Value MI) | Dynamic level/output bar (temperature, speed reference) |
+| **Tank** | `8` | `25` | 512 B (`tank_propertybag.bin`) | `1` (Value MI) | Fluid level vessel visualization |
+| **Dial Gauge** | `8` | `21` | 1464 B (`gauge_propertybag.bin`) | `1` (Value MI) | Circular analog meter with needle indicator |
 
 ---
 
-## 5. Składniki modułu narzędziowego
+## 5. Toolkit Components
 
-1. **`HmiDisplayBuilder.ps1`** - Rdzenny silnik zorientowany obiektowo (OOP) do budowania stron, paneli, przycisków, zmiennych i wskaźników z automatycznym wyliczaniem unikalnych ID, GUID i indeksów porządkowych.
-2. **`templates/`** - Katalog z wyekstrahowanymi szablonami binarnymi:
+1. **`HmiDisplayBuilder.ps1`**: Object-oriented engine for constructing pages, panels, buttons, variables, and meters with automated ID, GUID, and z-index assignment.
+2. **`templates/`**: Directory containing verified baseline binaries:
    - `empty_hmi_template.udb`
-   - `numeric_propertybag.bin` (1740 B)
+   - `numeric_propertybag.bin` (1,740 B)
    - `bargraph_propertybag.bin` (624 B)
    - `tank_propertybag.bin` (512 B)
-   - `gauge_propertybag.bin` (1464 B)
-3. **`generate_komora9_hmi.ps1`** - Główny skrypt produkcyjny generujący kompletny zestaw 8 ekranów ISA-101 dla czysto elektrycznej Komory nr 9 (`KOMORA9_HMI_ISA101.vld`).
-4. **`verify_displays.ps1`** - Narzędzie audytorskie weryfikujące poprawność archiwum, struktur bazy danych, relacji kluczy obcych i geometrii 320x240.
+   - `gauge_propertybag.bin` (1,464 B)
+3. **`verify_displays.ps1`**: 5-stage automated validator inspecting container integrity, database tables, relational foreign keys, and 320x240 screen boundary constraints.
 
 ---
 
-## 6. Instrukcja krok po kroku: Procedura generowania i importu
+## 6. Step-by-Step Generation and Import Workflow
 
-### Krok A: Wygenerowanie plików .VLD w systemie Windows
-Otwórz terminal PowerShell w głównym katalogu projektu i wykonaj polecenie:
-
+### Step 1: Programmatic Construction via PowerShell OOP API
 ```powershell
-powershell.exe -ExecutionPolicy Bypass -File "hmi-displays-generator\generate_komora9_hmi.ps1"
+. .\HmiDisplayBuilder.ps1
+
+$builder = [HmiDisplayBuilder]::new(".\templates\empty_hmi_template.udb")
+
+# Create Main Overview Display (ModuleID=1 designates startup display)
+$disp = $builder.NewDisplay("Main_Overview", [HmiColor]::LightGray, 1)
+
+# Add grouping card and title
+$disp.AddRectangle(4, 26, 312, 178, [HmiColor]::DarkGray, [HmiColor]::LightGray)
+$disp.AddLabel(8, 30, 160, 20, "SYSTEM MONITOR", [HmiColor]::Black, [HmiColor]::LightGray, 0)
+
+# Add numeric variable with interactive keypad overlay
+$disp.AddNumericVariable(180, 30, 80, 20, [HmiOperandType]::MI, 10, $true, 1)
+
+# Add command pushbuttons
+$disp.AddButton(10, 160, 90, 36, "START", [HmiOperandType]::MB, 1, [HmiColor]::White, [HmiColor]::Green)
+$disp.AddButton(110, 160, 90, 36, "STOP", [HmiOperandType]::MB, 2, [HmiColor]::White, [HmiColor]::Red)
+
+# Export package
+$builder.SaveVld(".\My_Application_Displays.vld")
 ```
 
-Skrypt utworzy plik `KOMORA9_HMI_ISA101.vld` w katalogu generatora oraz w katalogu głównym projektu.
-
-### Krok B: Weryfikacja integralności wygenerowanego pliku
-Przed importem do VisiLogic uruchom audytora integralności:
-
+### Step 2: Verifying Package Integrity
 ```powershell
-powershell.exe -ExecutionPolicy Bypass -File "hmi-displays-generator\verify_displays.ps1" -VldPath "KOMORA9_HMI_ISA101.vld"
+powershell -NoProfile -ExecutionPolicy Bypass -File .\verify_displays.ps1 -VldPath ".\My_Application_Displays.vld"
 ```
 
-Oczekiwany wynik audytu:
+*Expected Verification Output:*
 ```text
-Liczba stron HMI:       8
-Liczba kontrolek:       236
-Liczba linkow z PLC:    101
-Liczba bledow kryt.:    0
-Liczba ostrzezen:       0
-WYNIK: PLIK VLD JEST W 100% POPRAWNY I ZGODNY ZE SPECYFIKACJA VISILOGIC!
+Display count:          1
+Control count:          5
+PLC operand links:      3
+Critical errors:        0
+Warnings:               0
+RESULT: VLD PACKAGE IS 100% VALID AND READY FOR VISILOGIC IMPORT!
 ```
 
-### Krok C: Import ekranów w programie VisiLogic
-1. Uruchom program **VisiLogic** i otwórz projekt sterownika Vision V350.
-2. W lewym oknie drzewa projektu zlokalizuj gałąź **HMI Displays**.
-3. Kliknij prawym przyciskiem myszy na węzeł **HMI Displays** i wybierz **Import Displays...**.
-4. W oknie dialogowym wskaż plik `KOMORA9_HMI_ISA101.vld`.
-5. Potwierdź import – VisiLogic załaduje komplet 8 ekranów z gotowymi powiązaniami ze zmiennymi PLC.
+### Step 3: Importing Displays into VisiLogic
+1. Launch **Unitronics VisiLogic** and open your project (`.vlp`).
+2. In the navigation tree on the left, right-click **HMI Displays**.
+3. Select **Import Displays...**.
+4. Choose the verified `.vld` file.
+5. VisiLogic unpacks all displays, controls, and operand bindings into the project.
 
 ---
 
-## 7. Architektura 8 ekranów HMI Komory Suszarniczej nr 9
+## 7. Industrial Multi-Screen HMI Architecture
 
-Wygenerowany pakiet `KOMORA9_HMI_ISA101.vld` zawiera 8 profesjonalnych ekranów synoptycznych spełniających standard ANSI/ISA-101.01:
+High-performance industrial HMI applications follow structured, multi-tier screen hierarchies:
 
-### Ekran 1: `! Start-Up Display` (Strona Główna & Panel Sterowniczy Maszyny – ModuleID=1)
-- **Rola:** Główny pulpit maszyny, pierwszy ekran po uruchomieniu sterownika PLC.
-- **Panel Sterowniczy:** Duże przyciski dotykowe `[ START ]` (**MB 22**), `[ PAUZA ]` (**MB 21**), `[ STOP ]` (**MB 20**).
-- **Status procesu:** Krok (**MI 21**), Czas kroku (**MI 23** min).
-- **Pomiary procesowe (PV) vs zadane (SP):**
-  - Temperatura komory: `T [C]:` (**MI 0**) | `SP:` (**MI 31**)
-  - Wilgotność powietrza: `RH [%]:` (**MI 1**) | `SP:` (**MI 32**)
-- **Synoptyka 6 Niezależnych Sekcji Elektrycznych:**
-  - Status 6 wentylatorów obiegowych (**W1:RUN .. W6:RUN**) w kolorze zielonym.
-  - Status grzania 6 grup grzałek elektrycznych SSR (**G1:ON .. G6:ON**) w kolorze zielonym – **wskazuje precyzyjnie, która sekcja w danym momencie grzeje!**
-- **Niezależna Wentylacja Komory:**
-  - Tor Nawiewu: `NAWIEW VFD1: [RUN]`, prędkość (**MI 61** %).
-  - Tor Wyciągu: `WYCIAG VFD2: [RUN]`, prędkość (**MI 62** %).
-- **Dolny pasek nawigacyjny (One-Click):** `[ PROCES ]`, `[ RECEPT ]`, `[ WENTYL ]`, `[ ALARMY ]`, `[ DOSTEP ]`.
+```mermaid
+graph TD
+    Start["1. ! Start-Up Display (Overview & Master Controls)"]
+    Proc["2. Detailed Process Control & Multi-Sensor PVs"]
+    Recipe["3. Recipe Management & Setpoint Entry (PIN Protected)"]
+    Alarms["4. Alarm Summary & Diagnostics (ISA-18.2)"]
+    Service["5. Manual I/O Diagnostics & Calibration"]
+    
+    Start --> Proc
+    Start --> Recipe
+    Start --> Alarms
+    Start --> Service
+```
 
-### Ekran 2: `L2_KONTROLA_PROCESU` (Szczegółowa Kontrola Operacyjna)
-- Dokładne pomiary wielopunktowe PV (Temperatura **MI 0**, Wilgotność **MI 1**).
-- Suma aktywnych sekcji grzałek elektrycznych (**MI 50** z 6).
-- **Słupkowy bargraph temperatury PV**.
-- Porównanie z nastawami SP (**MI 31**, **MI 32**, **MI 30**).
-- Przyciski operacyjne faz: `[ NASTEPNY KROK ]` (**MB 24**), `[ KASUJ ALARM ]` (**MB 23**).
-
-### Ekran 3: `L3_RECEPTURY` (Baza Receptur i Nastawy – Dostęp: TECHNOLOG)
-- Bezpośrednia edycja dotykowa parametrów procesu z wirtualnej klawiatury numerycznej (`Keypad = 1`):
-  - Temperatura zadana SP (**MI 31**)
-  - Wilgotność zadana SP (**MI 32**)
-  - Czas kroku (**MI 30**)
-  - Histereza regulacji (**MI 40**)
-  - Wydajność wentylacji (**MI 34**)
-- Zarządzanie bankiem receptur w Data Tables: numer receptury (**MI 70**), liczba kroków (**MI 71**), `[ ZAPISZ DO DT ]` (**MB 26**), `[ RECEPTURA + ]` (**MB 25**), `[ KROK + ]` (**MB 24**).
-
-### Ekran 4: `L3_WENTYLACJA_REKUP` (Niezależne Tory Wentylacji)
-- **Tor Nawiewu (VFD1):** Status READY, nastawa prędkości z klawiatury dotykowej (**MI 61**), dynamiczny słupek mocy (Bargraph), przycisk startu (**MB 102**).
-- **Tor Wyciągu (VFD2):** Status READY, nastawa prędkości z klawiatury dotykowej (**MI 62**), dynamiczny słupek mocy (Bargraph), przycisk startu (**MB 103**).
-
-### Ekran 5: `L4_ALARMY_STATUS` (Rejestr Alarmów wg ANSI/ISA-18.2)
-- **Karta Priorytet 1 (Czerwone - Awaria krytyczna / STOP cyklu):** E-STOP (**I6** / **MB 38**), Przegrzanie komory STB > 95°C (**I7** / **MB 37**), Zwarcie SSR sekcji 1-6 (**MB 34** / **MB 35**), Wyłącznik silnikowy wentylatora (**MB 36**).
-- **Karta Priorytet 2 (Żółte - Ostrzeżenia technologiczne):** Drzwi otwarte (**I11** / **MB 13**), Zanik zasilania podczas cyklu (**MB 25**).
-- Przyciski funkcyjne: `[ KASUJ / KWITUJ ALARMY ]` (**MB 23**), `[ WYCISZ SYGNALIZATOR ]` (**MB 41**).
-
-### Ekran 6: `L4_LOGOWANIE_UPRAWNIENIA` (3 Poziomy Dostępu)
-- **Strefa 1 (Operator):** Domyślny, bez hasła. Pełne operowanie cyklem suszenia. Przycisk `[ WYLOGUJ / OP ]` (**MB 82**).
-- **Strefa 2 (Technolog):** Wprowadzanie hasła PIN (**MI 81** z klawiatury dotykowej), przycisk `[ ZALOGUJ TECH ]` (**MB 80**).
-- **Strefa 3 (Serwis):** Wprowadzanie hasła PIN (**MI 82** z klawiatury dotykowej), przycisk `[ ZALOGUJ SERW ]` (**MB 81**).
-
-### Ekran 7: `L4_SERWIS_SPECJALNY` (Ustawienia Specjalne – Dostęp: SERWIS)
-- **Konfiguracja wznowienia po zaniku zasilania (`MB 40`):**
-  - `0` = Tryb Bezpieczny: Wymagane potwierdzenie startu przez operatora po powrocie zasilania.
-  - `1` = Tryb Ciągły: Samoczynny Auto-Resume cyklu suszenia.
-  - Przełącznik dotykowy: `[ PRZELACZ TRYB RESUME (MB40) ]` (**MB 40**).
-- **Parametry technologiczne maszyny:**
-  - Czas wybiegu wentylatorów chłodzących (**MI 43**, domyślnie 90 s, edycja `Keypad = 1`).
-  - Zwłoka kaskady załączania sekcji (4 s).
-- Przejście do manualnych testów wyjść: `[ >> PRZEJDZ DO RECZNYCH TESTOW WYJSC >> ]` (**MB 17**).
-
-### Ekran 8: `L4_SERWIS_TESTY_RECZNE` (Ręczny Test Wyjść – Dostęp: SERWIS)
-- Ostrzeżenie: *Dozwolone tylko przy wyłączonym cyklu (STOP)*.
-- Niezależny test 6 wentylatorów obiegowych: **W1** (**MB 90**) .. **W6** (**MB 95**).
-- Niezależny test 6 sekcji grzałek elektrycznych SSR: **G1** (**MB 96**) .. **G6** (**MB 101**).
-- Niezależny test wentylacji: **NAWIEW VFD1** (**MB 102**), **WYCIAG VFD2** (**MB 103**).
-- Załączenie zasilania siłowego sekcji grzewczych: **MOC 400V** (**MB 104** / Wyjście **O 8**).
+### Proven Production Layout Examples in `examples/hmi-displays/`:
+1. **Water Treatment & Pumping** (`WATER_TREATMENT_PUMPING.vld`):
+   - High-performance grayscale theme adhering strictly to ISA-101.
+   - Pumping station synoptics, lead-lag status, tank volume meters, and pressure indicators.
+2. **HVAC Air Handling Unit** (`HVAC_AIR_HANDLING_UNIT.vld`):
+   - Modern Dark Industrial theme with high-contrast colored equipment states.
+   - Supply/extract fan speeds, filter differential pressures, heating coil control, and damper positions.
+3. **Chemical Batch Reactor** (`CHEMICAL_BATCH_REACTOR.vld`):
+   - Process Schematic (P&ID) style with neutral equipment graphics.
+   - Vessel temperature/pressure dial gauges, agitator state, reagent valve controls, and step sequencer status.
+4. **Cold Storage Refrigeration** (`COLD_STORAGE_REFRIGERATION.vld`):
+   - Clean Modular Grid with dual-temperature monitoring and defrost cycle timers.
 
 ---
 
-## 8. Audytor integralności bazy (verify_displays.ps1)
+## 8. Database Integrity Auditor (verify_displays.ps1)
 
-Narzędzie weryfikacji wykonuje 5-fazowy test:
-1. **Audyt kontenera ZIP:** Sprawdzenie nagłówków i dekompresja do izolowanego katalogu pamięci podręcznej.
-2. **Audyt silnika bazodanowego:** Otwarcie połączenia OLEDB i sprawdzenie spójności metadanych Jet 4.0.
-3. **Audyt tabel stron:** Sprawdzenie unikalności ID, lustrzanej spójności tabel `Pages` i `Pages_all` oraz obecności bufora w `DisplayNote`.
-4. **Audyt geometrii 320x240:** Sprawdzenie czy którakolwiek kontrolka nie wykracza poza obszar matrycy V350 (`Xs >= 0`, `Ys >= 0`, `Xs + Dx <= 320`, `Ys + Dy <= 240`).
-5. **Audyt relacji kluczy obcych:** Zapewnienie, że każdy wpis w `HMI_Operands` wskazuje na istniejący element `HMI_Elements`, a każdy element wskazuje na istniejący ekran `Pages`.
+The auditor executes a 5-phase validation:
+1. **Container Integrity:** Validates PKWare ZIP structure and extracts payload to an isolated temporary sandbox.
+2. **Database Engine Integrity:** Opens an OLEDB connection and validates Jet 4.0 table structures.
+3. **Display Headers Audit:** Confirms unique IDs, mirror consistency between `Pages` and `Pages_all`, and mandatory `DisplayNote` buffers.
+4. **320x240 Geometry Audit:** Asserts all controls remain within screen bounds ($Xs \ge 0, Ys \ge 0, Xs + Dx \le 320, Ys + Dy \le 240$).
+5. **Relational Link Integrity:** Verifies that every operand mapping points to a valid graphic control, and every control belongs to an existing display.
 
 ---
 
-## 9. Baza wiedzy i rozwiązywanie problemów (Troubleshooting)
+## 9. Troubleshooting & Diagnostics Reference
 
-### Pułapka 1: Zmienna `$PID` w środowisku PowerShell
-- **Objaw:** Błąd interpretera `Cannot overwrite variable PID because it is read-only or constant`.
-- **Przyczyna:** W PowerShell zmienna `$PID` to zastrzeżona zmienna systemowa zawierająca Process ID bieżącej sesji. Ponieważ PowerShell nie rozróżnia wielkości liter, nazwy `$pId`, `$pid`, `$PID` odnoszą się do tej samej zmiennej stałej.
-- **Rozwiązanie:** W skryptach manipulujących stronami HMI należy stosować nazwy `$curPageId`, `$displayId` lub `$paramId`.
+### Quirk 1: Reserved `$PID` Variable in PowerShell
+- **Symptom:** Script error: `Cannot overwrite variable PID because it is read-only or constant`.
+- **Root Cause:** In PowerShell, `$PID` is a reserved system variable containing the current Process ID.
+- **Resolution:** Use `$displayId`, `$curPageId`, or `$pageIndex` for page identifiers.
 
-### Pułapka 2: Zastrzeżone słowa kluczowe w silniku Microsoft Access Jet SQL
-- **Objaw:** Błąd składni `Syntax error in INSERT INTO statement` przy dodawaniu rekordów.
-- **Przyczyna:** Kolumny takie jak `ID`, `Type`, `Binary`, `Text`, `Lock`, `GUID` są słowami kluczowymi silnika Jet 4.0.
-- **Rozwiązanie:** Wszystkie nazwy kolumn w zapytaniach SQL **muszą** być ujęte w nawiasy kwadratowe, np. `INSERT INTO [HMI_Elements] ([ID], [Type], [Text], [Binary], [GUID]) VALUES (...)`.
+### Quirk 2: Jet SQL Reserved Keywords
+- **Symptom:** Syntax error in `INSERT INTO` statements.
+- **Root Cause:** Column names such as `ID`, `Type`, `Binary`, `Text`, `Lock`, and `GUID` are reserved in Jet 4.0 SQL.
+- **Resolution:** Wrap all column identifiers in brackets: `INSERT INTO [HMI_Elements] ([ID], [Type], [Text], [Binary]) VALUES (...)`.
 
-### Pułapka 3: Format archiwum w poleceniach `Compress-Archive` i `Expand-Archive`
-- **Objaw:** Błąd `NotSupportedArchiveFileExtension: .vld is not a supported archive file format. .zip is the only supported archive file format`.
-- **Przyczyna:** Wbudowane polecenia kompresji w PowerShell 5.1 weryfikują rozszerzenie pliku i odrzucają pliki inne niż `.zip`.
-- **Rozwiązanie:** Archiwum jest tworzone tymczasowo jako `output.zip`, a następnie atomowo przenoszone/zmieniane na `.vld` za pomocą `Move-Item`.
+### Quirk 3: File Extensions in `Compress-Archive`
+- **Symptom:** `NotSupportedArchiveFileExtension: .vld is not a supported archive file format`.
+- **Root Cause:** PowerShell's `Compress-Archive` strictly enforces `.zip` extension names.
+- **Resolution:** Compress to a temporary `.zip` file, then atomically rename to `.vld` using `Move-Item`.
 
-### Pułapka 4: Przesyłanie obiektów `DataTable` przez pipeline PowerShell
-- **Objaw:** Błąd `Cannot index into a null array` przy próbie odczytu wierszy `$dt.Rows[$i]`.
-- **Przyczyna:** Standardowy mechanizm pipeline w PowerShell automatycznie rozwija instancję `DataTable` do tablicy jej wierszy (`DataRow[]`). Wtedy obiekt traci właściwość `.Rows`.
-- **Rozwiązanie:** W funkcjach pomocniczych należy zwracać obiekt ze wskaźnikiem jednoelementowej tablicy: `return ,$dt`.
+### Quirk 4: Mandatory `DisplayNote` Record
+- **Symptom:** VisiLogic crashes with a fatal memory violation upon opening display properties.
+- **Root Cause:** VisiLogic requires a 510-byte zeroed buffer record in `DisplayNote` for every `PageID`.
+- **Resolution:** `HmiDisplayBuilder` automatically inserts a `byte[510]` buffer whenever a new display is registered.
 
-### Pułapka 5: Brakujący rekord w tabeli `DisplayNote`
-- **Objaw:** VisiLogic wyłącza się (crash z błędem naruszenia pamięci) w momencie dwukrotnego kliknięcia w tło zaimportowanego ekranu.
-- **Przyczyna:** VisiLogic oczekuje, że dla każdego `PageID` w tabeli `Pages` istnieje odpowiadający rekord w `DisplayNote` z 510-bajtowym wyzerowanym buforem.
-- **Rozwiązanie:** Generator zawsze wstawia pusty rekord `byte[510]` do `DisplayNote` podczas rejestrowania każdego nowego ekranu.
-
-### Pułapka 6: Uszkodzenie struktury Property Bag dla zmiennych numerycznych
-- **Objaw:** VisiLogic wyświetla komunikat *Error reading PropertyBag* lub kontrolka wyświetla się jako czarny kwadrat.
-- **Przyczyna:** Zmienne numeryczne, bargraphy i tanki wymagają ściśle określonego formatu binarnego OLE. Ręczne wpisanie ciągu bajtów o złej długości powoduje błąd deserializacji.
-- **Rozwiązanie:** Generator korzysta z wyekstrahowanych, zweryfikowanych szablonów binarnych z `templates/*.bin`, gwarantując 100% zgodność binarną.
+### Quirk 5: Binary Property Bag Corruption
+- **Symptom:** VisiLogic reports *Error reading PropertyBag* or renders controls as blank black rectangles.
+- **Root Cause:** Numerical variables and analog meters require exact OLE byte alignments.
+- **Resolution:** The generator clones verified binary templates from `templates/*.bin`, guaranteeing 100% binary compliance.

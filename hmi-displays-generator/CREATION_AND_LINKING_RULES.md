@@ -1,144 +1,89 @@
-# Kompletna Lista Zasad Projektowania, Układu i Łączenia Ekranów HMI VisiLogic (.VLD)
-### Standard Inżynierski | Sterowniki Unitronics Vision V350 (Matryca 320x240 px, Dotyk)
+# Design, Layout, and Linking Rules for VisiLogic HMI Displays (.VLD)
+### Engineering Standard | Unitronics Vision Series Controllers (320x240 Touchscreen Matrix)
 
-Dokument określa bezwzględne reguły projektowe, geometryczne, bazodanowe oraz ergonomiczne dla automatycznego generowania pakietów ekranów operatorskich HMI w formacie `.vld`. Zastosowanie się do tych zasad gwarantuje 100% stabilności importu w oprogramowaniu VisiLogic oraz pełną zgodność ze standardem **ANSI/ISA-101.01 (High Performance HMI)**.
+This reference manual specifies the geometric, database, and ergonomic rules for programmatically generating `.vld` display files. Following these rules ensures 100% stability when importing into Unitronics VisiLogic and guarantees adherence to the **ANSI/ISA-101.01 (High Performance HMI)** standard.
 
 ---
 
-## 1. Ograniczenia Fizyczne i Geometria Matrycy Unitronics Vision V350
+## 1. Physical Boundaries & Geometry of the 320x240 Matrix
 
-Sterownik PLC Unitronics Vision V350 wyposażony jest w kolorowy wyświetlacz TFT o parametrach:
-- **Rozdzielczość:** dokładnie **320 pikseli szerokości (X)** na **240 pikseli wysokości (Y)**.
-- **Głębia kolorów:** 16-bit (65 536 kolorów, paleta Unitronics).
-- **Interfejs użytkownika:** Rezystancyjny ekran dotykowy (Touch Screen) + 5 programowalnych klawiszy funkcyjnych.
+The Unitronics Vision V350 features a 3.5" color TFT display:
+- **Resolution:** Exactly **320 pixels horizontal ($X$)** by **240 pixels vertical ($Y$)**.
+- **Color Depth:** 16-bit color (65,536 colors, Unitronics palette).
+- **Operator Interface:** Resistive touchscreen + front bezel navigation and function keys.
 
 ```text
 (0,0) ------------------------------------------------------------- (319,0)
-|  Pasek Tytułowy / Nagłówek Ekranu (Y = 0 .. 24 px)                      |
+|  Title Banner / System Status (Y = 0 .. 24 px)                          |
 |-------------------------------------------------------------------------|
 |                                                                         |
-|  Obszar Roboczy Procesu / Karty Synoptyczne                             |
+|  Active Process Workspace / Synoptic Panels                             |
 |  (Y = 25 .. 205 px)                                                     |
 |                                                                         |
 |-------------------------------------------------------------------------|
-|  Dolny Pasek Nawigacyjny "One-Click" (Y = 206 .. 239 px)                |
+|  Bottom "One-Click" Navigation Bar (Y = 206 .. 239 px)                  |
 (0,239) --------------------------------------------------------- (319,239)
 ```
 
-### 1.1. Bezwzględne Granice Geometrii Kontrolek
-Żadna kontrolka ani jej cień/ramka nie może wykraczać poza obszar roboczy wyświetlacza:
+### 1.1. Absolute Coordinate Bounds
+No graphic control, border, or drop-shadow may extend beyond the visible display area:
 $$0 \le Xs \le 319$$
 $$0 \le Ys \le 239$$
 $$Xs + Dx \le 320$$
 $$Ys + Dy \le 240$$
-Naruszenie powyższych granic powoduje obcięcie kontrolki lub błąd alokacji bufora graficznego w VisiLogic.
+Violating these bounds causes visual clipping or buffer allocation errors in VisiLogic.
 
-### 1.2. Ergonomia Przycisków Dotykowych
-- Minimalne wymiary przycisku dotykowego pod palec operatora w rękawicy przemysłowej wynoszą: **$Dx \ge 40$ px, $Dy \ge 24$ px**.
-- Odstęp (margines) pomiędzy sąsiadującymi przyciskami dotykowymi: minimum **4 piksele**, aby wyeliminować przypadkowe naciśnięcie sąsiedniej strefy.
-
----
-
-## 2. Żelazne Zasady Stabilności Bazy Danych .VLD (Zero-Crash Policy)
-
-VisiLogic wykorzystuje 32-bitowe biblioteki ActiveX/COM napisane w Visual Basic 6 (`UnHmPge2.dll`). Nieprawidłowości w relacjach bazy Jet 4.0 prowadzą do błędu *Run-time error '9': Subscript out of range* lub natychmiastowego zamknięcia programu (Crash).
-
-### Zasada 1: Zerowa Liczba Wpisów w Tabeli `HMIJumps` dla Paneli Dotykowych V350
-- **Mechanizm błędu:** Biblioteka `UnHmPge2.dll` alokuje wewnętrzną tablicę `JumpArray(1 To 4)` przeznaczoną wyłącznie dla sterowników z fizyczną klawiaturą (np. V120, V280). Dodanie wpisów do tabeli `HMIJumps` przepełnia bufor i wyrzuca krytyczny błąd VB6 Error 9.
-- **Wymóg bezwzględny:** Dla ekranów sterownika Vision V350 tabela `HMIJumps` w pliku `HMIBufferColorPages.udb` **musi zawierać dokładnie 0 rekordów**!
-- **Sposób nawigacji:** Nawigacja dotykowa na panelach V350 odbywa się wyłącznie poprzez pole `TouchOprndAddr` w kontrolce przycisku (powiązanie z bitem `MB`, który w logice drabinkowej wywołuje skok ekranu).
-
-### Zasada 2: Wyeliminowanie Zależności od Niezainicjalizowanych Trendów (`VarType = 23`)
-- **Mechanizm błędu:** Wklejenie kontrolki Trendu powoduje wykonanie zapytania SQL do projektu docelowego: `SELECT Name FROM Trends WHERE TrendID=1`. Jeśli użytkownik nie utworzył wcześniej obiektu `Trend 1` w drzewie PLC, VisiLogic próbuje odczytać pusty indeks kolekcji i ulega awarii.
-- **Rozwiązanie inżynierskie:** W uniwersalnych pakietach HMI należy stosować natywne **Bargraphy procesowe (`VarType = 24`)**, dynamiczne wskaźniki synoptyczne i multizmienne numeryczne. Są one w 100% samowystarczalne i nie wymagają prekonfiguracji projektu PLC.
-
-### Zasada 3: Obowiązkowy Rekord Bufora w Tabeli `DisplayNote`
-- Dla każdego zdefiniowanego ekranu (`PageID`) w tabeli `Pages` **musi istnieć dokładnie jeden rekord w tabeli `DisplayNote`**.
-- Rekord ten zawiera wyzerowany bufor binarny o długości **dokładnie 510 bajtów**. Brak tego rekordu powoduje naruszenie pamięci (Memory Access Violation) przy próbie otwarcia właściwości strony.
-
-### Zasada 4: Lustrzana Spójność Tabel `Pages` i `Pages_all`
-- Tabele `Pages` oraz `Pages_all` muszą zawierać dokładnie ten sam zestaw rekordów o identycznych identyfikatorach `ID`, nazwach, kolorach tła i flagach `ModuleID` (1 dla Start-Up Display, 2 dla stron podrzędnych).
-
-### Zasada 5: Integralność Binarna Obiektów Property Bag
-Wszystkie kontrolki procesowe wymagają strumienia bajtów OLE Property Bag o ściśle zdefiniowanej długości:
-- **Numeric Variable (`VarType = 8`):** dokładnie **1740 bajtów** (`numeric_propertybag.bin`).
-- **Bargraph (`VarType = 24`):** dokładnie **624 bajty** (`bargraph_propertybag.bin`).
-- **Gauge (`VarType = 21`):** dokładnie **1464 bajty** (`gauge_propertybag.bin`).
-- **Tank (`VarType = 25`):** dokładnie **512 bajtów** (`tank_propertybag.bin`).
-- **Dynamic Binary Text (`VarType = 2`):** wygenerowany przez dedykowany generator nagłówków OLE `CreateBinaryTextPropertyBag()`.
+### 1.2. Touch Target Ergonomics
+- Minimum touch target dimensions for operator gloves: **$Dx \ge 40$ px, $Dy \ge 24$ px**.
+- Inter-element spacing: Minimum **4 pixels** between adjacent touch targets to eliminate accidental presses.
 
 ---
 
-## 3. Zasady Łączenia Kontrolek ze Zmiennymi PLC (Operand Binding Rules)
+## 2. Relational Database Rules for Stability (Zero-Crash Policy)
 
-Każde powiązanie kontrolki ze zmienną PLC musi być zarejestrowane w tabeli `HMI_Operands` z zachowaniem poniższych reguł:
+VisiLogic utilizes legacy 32-bit ActiveX/COM components (`UnHmPge2.dll`) written in Visual Basic 6. Structural or relational inconsistencies in the Access Jet 4.0 database trigger *Run-time error '9': Subscript out of range* or fatal application termination.
 
-### 3.1. Przyciski Dotykowe (Touch Buttons)
-- Pole `TouchOprndAddr` w tabeli `HMI_Elements` musi wskazywać numer bitu pamięci `MB` (np. `22`).
-- W tabeli `HMI_Operands` musi zostać dodany rekord:
-  - `ElementID` = ID przycisku
-  - `OperandType` = `1` (`MB`)
-  - `OperandAddress` = numer bitu `MB`
-  - `FieldRole` = `2` (Touch Operand)
+### Rule 1: Zero Records in `HMIJumps` for Touchscreen Models (V350)
+- **Failure Mode:** `UnHmPge2.dll` allocates an internal fixed-size array `JumpArray(1 To 4)` designed solely for keypad controllers with monochrome displays (e.g. V120, V280). Populating `HMIJumps` on color touchscreen models overruns this buffer, crashing VisiLogic with VB6 Error 9.
+- **Mandatory Requirement:** For Vision V350 displays, the `HMIJumps` table in `HMIBufferColorPages.udb` **must contain exactly 0 records**.
+- **Touch Navigation Implementation:** Display switching on touchscreen models is handled via touch buttons linked to memory bits (`MB`), which trigger display jump instructions in ladder logic (writing the destination display index to `SI 9`).
 
-### 3.2. Odczyt Wartości Procesowych (Process Values - PV)
-- Dotyczy zmiennych numerycznych odczytu (`VarKeyPadEntry = 0`), słupków bargraph, zegarów gauge i wskaźników zbiornika.
-- W tabeli `HMI_Operands` dodawany jest rekord z rolą:
-  - `FieldRole` = `1` (Value Operand)
-  - `OperandType` = `3` (`MI`) lub `16` (`DW`) lub `5` (`ML`)
+### Rule 2: Avoiding Uninitialized Trend Control Dependencies (`VarType = 23`)
+- **Failure Mode:** Placing a Trend element issues an immediate SQL query against the target project: `SELECT Name FROM Trends WHERE TrendID=1`. If Trend 1 is not pre-configured in the project, VisiLogic attempts to read an empty collection and crashes.
+- **Engineering Solution:** Use self-contained **Process Bargraphs (`VarType = 24`)**, Tank level meters (`VarType = 25`), and dial gauges (`VarType = 21`). These are 100% self-sufficient and require no pre-existing project objects.
 
-### 3.3. Zadawanie Parametrów z Klawiatury Dotykowej (Setpoints - SP)
-- Dotyczy pól nastaw technologicznych (temperatura zadana, wilgotność zadana, czas cyklu).
-- Kontrolka musi mieć ustawioną flagę: **`VarKeyPadEntry = 1`**.
-- W tabeli `HMI_Operands` dodawany jest rekord z rolą `FieldRole = 1` dla docelowego rejestru `MI`. Po dotknięciu operator otrzymuje systemowe okno klawiatury numerycznej VisiLogic z walidacją limitów Min/Max.
+### Rule 3: Mandatory Buffer Record in `DisplayNote`
+- For every defined display (`PageID`) in `Pages`, **there must exist exactly one record in `DisplayNote`**.
+- This record contains a zeroed binary buffer of **exactly 510 bytes**. Omitting this entry causes an unhandled memory violation when double-clicking the display canvas in VisiLogic.
 
-### 3.4. Dynamiczny Tekst Binarny (BinaryText Status)
-- Służy do wizualizacji stanu pracy napędów i sekcji (np. wentylatory W1..W6, grzałki G1..G6).
-- Rejestrowany w `HMI_Operands` z:
-  - `FieldRole` = `1` (Value)
-  - `OperandType` = `10` (Wyjście fizyczne `O`) lub `1` (`MB`) lub `9` (Wejście `I`)
-- Właściwości binarne kontrolki w `HMI_Elements` muszą posiadać:
-  - `DescriptionFontNumber = 282392660`
-  - `DefaultDisplay = 2`
-  - `StrStorageOprndAddr = -1`
-  - `StrStorageFont = 89352336`
+### Rule 4: Mirror Consistency between `Pages` and `Pages_all`
+- The `Pages` and `Pages_all` tables must maintain an identical set of records with matching `ID`, `Description`, `ColorBack`, and `ModuleID` fields (`ModuleID = 1` for the startup display, `ModuleID = 2` for secondary pages).
+
+### Rule 5: Foreign-Key Link Integrity in `HMI_Operands`
+- Every record in `HMI_Operands` must reference an existing `ElementID` in `HMI_Elements`.
+- Every record in `HMI_Elements` must reference an existing `DisplayID` in `Pages`.
 
 ---
 
-## 4. Zasady Projektowania Zgodnego z ANSI/ISA-101.01
+## 3. Standard Layout Grid and Zone Geometry
 
-Interfejs HMI musi być zaprojektowany zgodnie ze standardem **High Performance HMI (ANSI/ISA-101.01)**:
+To maintain ergonomic visual consistency across screens, construct layouts using these standardized zones:
 
-1. **Stonowane Tło i Redukcja Zmęczenia Wzroku:**
-   - Domyślne tło ekranu: neutralna szarość (`ColorBack = 74`).
-   - Unikać jaskrawych teł (czarnych o wysokim kontraście lub białych rażących operatora).
-2. **Rezerwacja Barw Wyłącznie dla Informacji Stanowych:**
-   - **Czerwony (`2`):** Zarezerwowany **wyłącznie** dla awarii, E-Stop i alarmów krytycznych (ISA-18.2 Priority 1).
-   - **Żółty (`14`):** Zarezerwowany dla ostrzeżeń technologicznych (otwarte drzwi, zbliżenie do limitu).
-   - **Zielony (`10`):** Praca urządzeń (silnik RUN, grzałka HEATING).
-   - **Szary (`103` / `104`):** Stan wyłączenia / spoczynku / gotowości (STOP, OFF).
-3. **Pasek Nawigacyjny "One-Click":**
-   - Na dole każdego ekranu ($Y=206..239$ px) znajduje się stały pasek z dużymi przyciskami umożliwiającymi bezpośrednie przejście do głównych obszarów funkcjonalnych bez błądzenia po zagnieżdżonych menu.
-4. **Hierarchia 3 Poziomów Dostępu:**
-   - **Poziom 1 (Operator):** Dostęp bezpośredni, bez hasła. Start, Pauza, Stop, podgląd parametrów i trendów.
-   - **Poziom 2 (Technolog):** Dostęp chroniony kodem PIN. Modyfikacja receptur, czasów faz, nastaw histerezy i temperatur.
-   - **Poziom 3 (Serwis):** Dostęp chroniony kodem PIN. Ręczne testy wyjść, parametry rozruchu, konfiguracja Auto-Resume po zaniku zasilania.
+| Display Region | Y-Start (`Ys`) | Height (`Dy`) | Purpose | Recommended Elements |
+|:---|:---:|:---:|:---|:---|
+| **Header Banner** | `0` | `24` px | Screen Title & Mode | Label (16x24 font), Heartbeat indicator, Status LED |
+| **Workspace** | `25` | `180` px | Process Monitoring & Control | Cards/Panels (`Dx=312, Dy=178`), Bargraphs, Gauges, Keypad entries |
+| **Navigation Bar**| `206` | `34` px | Global Display Switching | 4–5 Touch Buttons ($Dx=58 \dots 72$ px, $Dy=30$ px) |
 
 ---
 
-## 5. Procedura Walidacji i Testowania Pakietu VLD
+## 4. Best Practices for PLC Variable Linkage
 
-Przed importem pakietu do oprogramowania VisiLogic, wykonaj procedurę audytu w 32-bitowym PowerShell:
-
-```powershell
-C:\Windows\SysWOW64\WindowsPowerShell\v1.0\powershell.exe -ExecutionPolicy Bypass -File "narzedzia\generator hmi displays\verify_displays.ps1" -VldPath "KOMORA9_HMI_ISA101.vld"
-```
-
-### Kryteria Odbioru Technicznego Pakietu:
-- [x] Sprawdzenie archiwum ZIP i bazy `HMIBufferColorPages.udb` – Status OK.
-- [x] Spójność tabel stron `Pages` i `Pages_all` – 11 ekranów, identyczne ID.
-- [x] Obecność buforów `DisplayNote` – 11 rekordów po 510 B.
-- [x] Poprawność geometrii kontrolek w siatce 320x240 – 0 przekroczeń.
-- [x] Integralność relacji `HMI_Operands` – brak wiszących referencji.
-- [x] Tabela `HMIJumps` – dokładnie 0 wpisów.
-- [x] Błędy krytyczne: **0**, Ostrzeżenia: **0**.
+1. **Touch Pushbuttons**:
+   - Set `FieldRole = 2` in `HMI_Operands`.
+   - Link to `MB` flags in the user memory space ($MB \ge 1$).
+   - Never link physical output coils directly to touch pushbuttons; route touch inputs through ladder interlocks.
+2. **Numeric Display and Entry**:
+   - Set `FieldRole = 1` in `HMI_Operands`.
+   - Link readouts to `MI` (16-bit integer) or `DW` (32-bit double word) registers.
+   - For user setpoint entry, enable the virtual keypad overlay (`VarKeyPadEntry = 1`) and provide unit suffixes (e.g. `°C`, `%RH`, `bar`).
